@@ -1,0 +1,58 @@
+{
+  "corpus_schema_version": 1,
+  "task_id": "sha256:example0000000000000000000000000000000000000000000000000000000000",
+  "contributed_at": "2026-06-17T00:00:00Z",
+  "contributor": "@example",
+  "harness": "codex",
+  "model": "gpt-5-codex",
+  "repo": {
+    "remote_url": "https://github.com/example/widget.git",
+    "base_commit": "0123456789abcdef0123456789abcdef01234567",
+    "branch": "main",
+    "license_spdx": "MIT",
+    "is_public": true
+  },
+  "prompts": [
+    { "turn_index": 0, "role": "user", "text": "the CSV export drops the last row when the file has no trailing newline — fix it" }
+  ],
+  "transcript": {
+    "assistant_messages": [
+      { "turn_index": 0, "text": "Found it — the writer flushes on newline only. I'll flush remaining buffered bytes on close." }
+    ],
+    "tool_calls": [
+      { "turn_index": 0, "name": "Edit", "text": "export/csv.go" }
+    ],
+    "tool_outputs": [
+      { "turn_index": 0, "text": "ok (1 file changed)" }
+    ]
+  },
+  "code": {
+    "patch": "+++ b/export/csv.go\n+\tif w.buf.Len() > 0 {\n+\t\treturn w.flush()\n+\t}\n",
+    "files": [{ "path": "export/csv.go", "role": "solution" }]
+  },
+  "outcome": {
+    "verification": "passed",
+    "landed": true,
+    "landing_quality": "pr_link",
+    "termination": "clean",
+    "human_turns": 2,
+    "human_corrections": 0,
+    "rework_count": 1,
+    "files_touched": 1
+  },
+  "scorecard": {
+    "composite": 78,
+    "axes": [
+      { "name": "efficiency", "score": 72 },
+      { "name": "autonomy", "score": 100 },
+      { "name": "friction", "score": 80 },
+      { "name": "success", "score": 60 }
+    ],
+    "note": "provisional score over present axes; equal unlearned weights"
+  },
+  "scrub": {
+    "scrubber_version": "redact/1",
+    "spans_redacted": 0,
+    "notice": "automated redaction is best-effort and can miss secrets"
+  }
+}

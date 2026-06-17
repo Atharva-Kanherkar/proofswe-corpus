@@ -1,0 +1,41 @@
+name: validate
+
+on:
+  pull_request:
+    paths: ["tasks/**.json"]
+  push:
+    branches: [main]
+    paths: ["tasks/**.json"]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Determine changed task files
+        id: changed
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            files=$(git diff --name-only --diff-filter=d "$base" HEAD -- 'tasks/*.json' || true)
+          else
+            files=$(git diff --name-only --diff-filter=d HEAD~1 HEAD -- 'tasks/*.json' || true)
+          fi
+          echo "files<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$files" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Validate
+        run: |
+          files="${{ steps.changed.outputs.files }}"
+          if [ -z "$files" ]; then
+            echo "no task files changed"; exit 0
+          fi
+          echo "$files" | tr '\n' '\0' | xargs -0 python3 scripts/validate.py
