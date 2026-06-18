@@ -1,0 +1,856 @@
+{
+  "corpus_schema_version": 1,
+  "task_id": "sha256:2abb203e5134d5c2c94b98b35be49ca0e8239995a9085aff57b9a2bf68c5176f",
+  "contributed_at": "2026-06-18T09:25:47.599372Z",
+  "harness": "claudecode",
+  "model": "claude-opus-4-8",
+  "repo": {
+    "remote_url": "https://github.com/Atharva-Kanherkar/proofswe.git",
+    "base_commit": "3ebd993d74ac01aee7718293d21b01d2cc0dcac8",
+    "branch": "codex/outcome-first-deterministic-score",
+    "license_spdx": "MIT",
+    "is_public": true
+  },
+  "prompts": [
+    {
+      "turn_index": 0,
+      "role": "user",
+      "text": "You are editing a cinematic 0–5 second opening clip using ffmpeg.\n\nGoal:\nCreate a short opening video called `ai_india_opening_0_5s.mp4`.\n\nInput:\nThere is a 20-minute archival India video in this folder. Find the video file automatically if I do not provide the exact name.\n\nCreative direction:\nThe opening should feel historical, dark, hopeless at first, then quietly determined. The vibe is documentary + 3Blue1Brown-ish educational film. It should start from a blank screen with old radio hum/static, then cut into a meaningful archival moment from the video.\n\nTarget structure:\n0.0s to 1.2s:\n\n* Pure black screen\n* Old radio hum/static audio\n* Center text:\n  \"India was not born powerful.\"\n\n1.2s to 4.4s:\n\n* Use ffmpeg to scan the archival video and extract scene-change thumbnails/contact sheets.\n* Pick a visually strong segment that feels like post-independence India, struggle, crowds, streets, people, factories, newspapers, leaders, or rebuilding.\n* Avoid title cards, blank frames, watermarks, and boring still shots.\n* Use 3.2 seconds from the chosen segment.\n* Apply slow zoom-in, slight film grain/noise, low saturation, dark blue/black cinematic grading.\n* Overlay small text near bottom:\n  \"It inherited dependence.\"\n\n4.4s to 5.0s:\n\n* Fade toward black or cut to a darker frame.\n* Overlay:\n  \"Then it chose to build.\"\n\nImplementation requirements:\n\n1. Use ffprobe to detect video duration and stream info.\n2. Use ffmpeg scene detection to generate a contact sheet of candidate frames:\n\n   * Extract frames around scene changes using `select='gt(scene,0.25)'`.\n   * Also extract one frame every 10 seconds as fallback.\n   * Save them under `work/scene_thumbs/`.\n   * Create one or more contact sheets under `work/contact_sheets/`.\n3. If you can inspect images, choose the best timestamp yourself.\n4. If you cannot confidently inspect images, create 8 candidate 5-second opener videos using different strong scene-change timestamps and save them as:\n\n   * `candidates/opening_candidate_01.mp4`\n   * `candidates/opening_candidate_02.mp4`\n   * etc.\n     Also create `[REDACTED:secret.entropy].md` with the timestamps used and what each candidate likely contains.\n5. Generate the radio hum/static using ffmpeg only. Use a mix of low sine hum and subtle noise. Keep it low and cinematic, not annoying.\n6. Use a 9:16 vertical format, 1080x1920, suitable for reels/X/LinkedIn.\n7. Use safe fonts. If drawtext cannot find a font, locate one automatically from common Linux/macOS paths or use ffmpeg default if available.\n8. Final output should be H.264 MP4 with AAC audio:\n\n   * 1080x1920\n   * 30 fps\n   * yuv420p\n   * good quality CRF around 18–23\n9. Create a reproducible script:\n\n   * `make_opening.sh`\n   * It should run end-to-end.\n   * It should create folders if missing.\n   * It should fail with clear errors if ffmpeg/ffprobe are missing.\n\nImportant:\n\n* Do not use online services.\n* Do not add any watermark.\n* Do not overwrite the source video.\n* Keep the edit minimal, cinematic, and serious.\n* After generating, print the final file path and also print the candidate timestamps used.\nGo to downloads to find the indepndent india video"
+    },
+    {
+      "turn_index": 1,
+      "role": "user",
+      "text": "[Request interrupted by user]"
+    },
+    {
+      "turn_index": 2,
+      "role": "user",
+      "text": "Why did you stop?"
+    },
+    {
+      "turn_index": 3,
+      "role": "user",
+      "text": "open it"
+    }
+  ],
+  "transcript": {
+    "assistant_messages": [
+      {
+        "turn_index": 0,
+        "text": "I'll start by checking the tools and finding the source video. Let me run these checks in parallel."
+      },
+      {
+        "turn_index": 1,
+        "text": "I didn't deliberately stop — my two setup checks completed and I was about to continue, but you interrupted first. Here's what those checks found, and the likely reason you jumped in:\n\n- **Tools:** ffmpeg 8.1 and ffprobe 8.1 are both present. ✅\n- **Downloads (top level):** 5 videos, but **none** of them is the India archival video. They're all 5–14 MB (agentclash, chalkboard-demo, cursorful, water-cycle, wbc) — a 20-minute archival video would be hundreds of MB, so it's not at the top level of Downloads.\n\nSo the source isn't where a quick `ls` would catch it. Let me search Downloads recursively (and by size/name) to actually locate it before doing anything else."
+      },
+      {
+        "turn_index": 2,
+        "text": "Found it: **`[REDACTED:pii.name] Ministry of [REDACTED:pii.name] Division .mp4`** (315 MB — consistent with ~20 min). Note the trailing space in the filename, which I'll quote carefully throughout. Let me probe it."
+      },
+      {
+        "turn_index": 3,
+        "text": "I didn't stop — those were just setup checks, and I'll keep going now. Source is confirmed: **1192s (~19.9 min), 1280×720, 25 fps, H.264/AAC stereo**. That's a landscape archival film I'll reframe to vertical 9:16.\n\nLet me verify the ffmpeg filters/fonts I need and set up a clean project directory (I'll work in `~/Downloads/ai_india_opening/` so I don't pollute the `proofswe` git repo and don't touch the source)."
+      },
+      {
+        "turn_index": 4,
+        "text": "All filters present (`drawtext`, `zoompan`, `noise`, `vignette`, `colorbalance`, `eq`, `curves`, `sine`, `anoisesrc`, `amix`, `afade`, `vibrato`, `tile`) and **Georgia** serif is available — perfect for the [REDACTED:secret.entropy] caption vibe (fallbacks: Times, Arial, Helvetica, DejaVu).\n\nNow I'll kick off the heavy scene-detection scan in the **background** (it decodes the full 20-min film), and meanwhile build + verify the two cheap pieces — the synthetic radio bed and the black title card."
+      },
+      {
+        "turn_index": 5,
+        "text": "Good progress: **audio bed is built** (mean −24.9 dB, max −15.7 dB — nicely low/cinematic ✅), and the **background scene scan already completed** (exit 0). But **seg1 failed** — let me check why, and read the scan results."
+      },
+      {
+        "turn_index": 6,
+        "text": "`drawtext` is the blocker: the filtergraph says **\"No such filter: 'drawtext'\"** — this ffmpeg build lacks libfreetype (my earlier `-h filter` check was a false positive; note `drawtext` was actually absent from the `-filters` list too). That's also why the background scan produced **zero files** — every thumbnail step burned a timestamp via drawtext and failed silently.\n\nLet me confirm the build and find the best text path before deciding anything invasive."
+      },
+      {
+        "turn_index": 7,
+        "text": "Root cause confirmed: this Homebrew ffmpeg `8.1_1` was built **without [REDACTED:secret.entropy]** — so `drawtext`, `subtitles`, and `ass` are all unavailable (only `overlay`, `drawbox`, `colorize` exist for compositing). That's also why the scan wrote zero files: every thumbnail step relied on drawtext.\n\nRather than reinstall the user's ffmpeg (invasive — they have a `prompt-to-reel` project depending on it), I'll render text with **Pillow 11.3.0** (present, has its own freetype, uses the Georgia system font) into transparent PNGs and composite them with ffmpeg's `overlay`. This is non-invasive, gives better typography, and keeps audio \"ffmpeg-only\" as required. I'll make `make_opening.sh` prefer `drawtext` when available and fall back to Pillow otherwise.\n\nLet me write the two helper scripts (text-card renderer + labeled contact-sheet builder)."
+      },
+      {
+        "turn_index": 8,
+        "text": "Now I'll re-run the scene scan in the background (this time **without** drawtext — using `showinfo` to capture scene timestamps, then Pillow builds labeled contact sheets), and in parallel render the three text cards and rebuild seg1 to validate the Pillow→overlay pipeline."
+      },
+      {
+        "turn_index": 9,
+        "text": "seg1 built via the Pillow→overlay path. Let me visually verify the title card looks right."
+      },
+      {
+        "turn_index": 10,
+        "text": "The title card is exactly the vibe — clean centered Georgia serif, soft off-white, subtle shadow, [REDACTED:secret.entropy] feel. [REDACTED:pii.name]→overlay pipeline works perfectly.\n\nNow let me check on the background scene scan (it's decoding the full 20-min film)."
+      },
+      {
+        "turn_index": 11,
+        "text": "Scan complete: **88 scene-change thumbnails** (with exact timestamps) → 3 sheets, and **119 grid frames** (every 10s) → 4 sheets. Let me inspect all the contact sheets to understand the film's arc and pick the strongest post-independence/struggle/rebuilding moment."
+      },
+      {
+        "turn_index": 12,
+        "text": "This is **\"[REDACTED:pii.name]\"** ([REDACTED:pii.name]). Clear arc: ancient India → the \"dark years\" of colonial dependence (masses, cavalry, suffering crowds ~1:40–3:10) → WWII → independence (flag-raising, Nehru, crowds, military, celebration ~7:00–14:00).\n\nTwo key observations:\n1. The **\"dark years / waited in patience\" struggle footage (~1:40–3:10)** is the perfect thematic match for *\"It inherited dependence.\"*\n2. The source has **hardcoded English subtitles** near the bottom — I'll need to crop them out so they don't clash with my caption.\n\nLet me inspect the 88 scene-change frames (exact timestamps) to pick a strong, subtitle-clean struggle shot."
+      },
+      {
+        "turn_index": 13,
+        "text": "Now I have exact scene-change timestamps. The thematically perfect match for *\"It inherited dependence.\"* is the **\"dark years / masses waiting\" sequence (~2:34–3:23)** — notably a long take with no hard cuts (ideal for a smooth slow-zoom hold), plus the iconic **Gandhi-walking shot (~3:23)** and a **crowd march (~4:48)**. Let me pull raw frames at candidate timestamps to judge real content and locate the subtitle band precisely."
+      },
+      {
+        "turn_index": 14,
+        "text": "These are striking. The **chained-bondage paintings at ~3:00–3:06** (\"India waited in patience through the dark years\", men in literal chains, heads bowed) are the emotional bullseye for *\"It inherited dependence.\"* — dark, hopeless, exactly the brief. I've also confirmed the **subtitle band + \"fsh\" logo both sit in the bottom ~16%**, which my crop will remove. Let me check the three real-footage alternates (Gandhi, crowd march, huge crowd) before finalizing."
+      },
+      {
+        "turn_index": 15,
+        "text": "Now I have all candidates. Standouts:\n- **Chained-bondage \"dark years\" (D, ~3:06)** — literal people in chains, bowed: the exact meaning of *\"It inherited dependence.\"* Emotionally perfect.\n- **Gandhi close-up (E, ~3:24)** — iconic real footage.\n- **Epic crowd (G, ~14:31)** — a staggering sea of people with temple towers; most spectacular shot.\n\nThe deciding factor is how each survives the 9:16 center-crop (the source is 16:9, so I lose horizontal breadth). Let me render fully-graded full-bleed previews (subtitle/logo cropped, dark-blue cinematic grade, grain, vignette) to see exactly how each frames vertically."
+      },
+      {
+        "turn_index": 16,
+        "text": "The grade looks beautifully cinematic. Key findings:\n- **Gandhi (E)** is the most legible + iconic, and crops perfectly to portrait — but that exact moment sits between hard cuts (shots at 3:23.2 / 3:24.8 / 3:28.1), so a 3.2s window there would cut mid-zoom.\n- **Chains (D)** is most on-theme and is a long dissolve-montage with *no hard cuts* (ideal for a smooth slow-zoom), but my first grade was too murky to read the chains.\n- **Crowd (G)** is epic but more triumphant than \"dependence.\"\n\nLet me check the continuous Gandhi shot #8 (3.3s, 204.8–208.1) and re-grade the chains brighter so the bondage reads clearly."
+      },
+      {
+        "turn_index": 17,
+        "text": "The continuous Gandhi shot #8 degrades into a messy dissolve by 207s (8b), so it's not a clean 3.2s either. The bright chains read better but stay murky (it's a soft painting). Let me look at the one strong candidate I haven't viewed processed — the **crowd march (F, 4:48)**, which scene data shows is a *16-second continuous take* of real footage (people marching toward camera): continuous, real, on-theme, and legible."
+      },
+      {
+        "turn_index": 18,
+        "text": "**Decision locked.** The **crowd procession at 04:48.7 (F)** is the primary pick: it's real footage in a *16-second continuous take* (guarantees a flawless smooth slow-zoom — exactly what the brief wants), with a legible central white-clad figure descending steps amid a crowd, real motion, cinematic under the blue grade, and on-theme (a people in the struggle era). It avoids the chains' murkiness and the hard-cut problems of the Gandhi/crowd shots. The chains, Gandhi, and epic crowd become candidates.\n\nNow let me build the full primary opener and verify it end-to-end (frames + duration + audio)."
+      },
+      {
+        "turn_index": 19,
+        "text": "Single fix needed: the concat filter rejected a tiny SAR (sample-aspect-ratio) mismatch — the scaled archival segment carried `SAR 122880:122873` while the black segments are `1:1`. I'll force `setsar=1` on all three segments before concat."
+      },
+      {
+        "turn_index": 20,
+        "text": "**Assembled successfully** — H.264, 1080×1920, yuv420p, 30 fps, AAC, exactly 5.000s, ~5.4 Mbps. Now let me verify the actual content by extracting frames at each beat."
+      },
+      {
+        "turn_index": 21,
+        "text": "Audio is muxed at a low, cinematic level (mean −25 dB). Let me view the six beat frames to confirm the full visual flow."
+      },
+      {
+        "turn_index": 22,
+        "text": "All four beats land exactly as directed:\n- **0.6s** — \"India was not born powerful.\" centered on pure black ✅\n- **2.6s \u0026 3.6s** — the archival procession with the dark-blue cinematic grade, grain, vignette; **the slow zoom-in is clearly working** (the figure grows between 2.6s and 3.6s); \"It inherited dependence.\" sits legibly near the bottom, and the source's own subtitles/logo are cropped out ✅\n- **4.7s** — \"Then it chose to build.\" fading up on black, quietly determined ✅\n\nThe primary output is verified and correct. Now let me write the reproducible **`make_opening.sh`** (self-contained, with dependency checks, auto source-finding, scene detection, the Pillow/drawtext text fallback, radio bed, and the assembly), then use it to generate the 8 candidates + README."
+      },
+      {
+        "turn_index": 23,
+        "text": "Let me fix one fragility before running — the `bc`-based HH:MM:SS formatting in the candidate loop is unreliable with decimals. I'll switch it to `awk`."
+      },
+      {
+        "turn_index": 24,
+        "text": "Now let me make it executable and run it in `candidates` mode — this validates the script end-to-end (rebuilds the final via the same code path) and produces the 8 candidate openers + README."
+      },
+      {
+        "turn_index": 25,
+        "text": "The script ran end-to-end cleanly: auto-located the source, picked the Pillow engine + Georgia font, skipped the (already-done) scan, rebuilt the final via the same validated path, and produced all 8 candidates + README. There's one **cosmetic** bug — the probe log mislabeled fps/pix (ffprobe returned those two fields in a different order than requested). Let me fix that, then verify the candidates I hadn't visually confirmed (07 leader-mic, 08 army-march)."
+      },
+      {
+        "turn_index": 26,
+        "text": "All 8 candidates built and README is correct. Let me verify the four candidate frames — especially 07 (leader-mic) and 08 (army-march), which I described from grid context but hadn't confirmed frame-accurate."
+      },
+      {
+        "turn_index": 27,
+        "text": "Candidates 02 (chains), 06 (vast crowd), and 08 (marching crowd) look great and on-theme. But **candidate 07 is mischaracterized** — at 468s the frame is actually a man behind a wireframe-globe newsreel graphic, *not* \"a leader at a microphone.\" I'll find a verified, accurately-describable replacement for that slot. Let me check a few nearby moments (Nehru-at-mic region, and the flag-raising)."
+      },
+      {
+        "turn_index": 28,
+        "text": "Two great finds: **474s is a striking profile portrait of Nehru** (white cap — unmistakably the leader), and 478s is leaders before the tricolor. The globe frame at 468 was a poor pick. I'll also relabel candidate 08 — that footage is white-clad **civilians** streaming down steps, not soldiers. Let me correct both entries for accuracy, then rebuild the candidate set cleanly."
+      },
+      {
+        "turn_index": 29,
+        "text": "The corrected candidate 07 is now a genuine, striking **Nehru profile** — accurate and iconic. And the spec check confirms **all 9 videos are uniform**: H.264, 1080×1920, yuv420p, 30 fps, AAC, exactly 5.000s. The **source file is untouched** (original mtime intact, never written).\n\nEverything is built and verified. Let me record one reusable environment fact (this machine's ffmpeg lacks `drawtext`) so future video work doesn't rediscover it the hard way."
+      },
+      {
+        "turn_index": 30,
+        "text": "Done. Everything is built, verified frame-by-frame, and spec-checked.\n\n## ✅ Final output\n\n**`~/Downloads/ai_india_opening/ai_india_opening_0_5s.mp4`**\nH.264 / yuv420p · **1080×1920 (9:16)** · 30 fps · CRF 20 · AAC · exactly **5.000s** · ~3.3 MB\n\nI worked in a dedicated folder (`~/Downloads/ai_india_opening/`) so nothing touched the `proofswe` repo, and the **20-min source was never modified** (`[REDACTED:pii.name] Ministry of [REDACTED:pii.name] Division .mp4`, auto-located in Downloads).\n\n## Timeline (verified)\n| Time | Beat |\n|---|---|\n| 0.0–1.2s | Pure black + synthetic radio hum/static · **\"India was not born powerful.\"** |\n| 1.2–4.4s | Archival @ **00:04:48.7**, slow zoom-in + grain + low-sat **dark-blue grade** + vignette · **\"It inherited dependence.\"** |\n| 4.4–5.0s | Fade to black · **\"Then it chose to build.\"** |\n\n**Chosen segment (00:04:48.7):** a white-clad figure descending steps through a dense crowd — real footage in a *16-second continuous take*, so the slow zoom is perfectly smooth. I inspected 88 scene-change thumbnails + 119 grid frames (contact sheets in `work/contact_sheets/`) and picked this for tone (somber, struggle-era), legibility, and clean motion.\n\n## Candidate openers — `candidates/` (+ `README.md`)\nThe brief's 8 alternates, each a full 5s opener differing only by archival in-point:\n\n| # | In-point | Contents |\n|---|---|---|\n| 01 | 00:04:48.7 | Procession down steps (**chosen**) |\n| 02 | 00:03:06.0 | Men in chains, \"the dark years\" |\n| 03 | 00:03:00.0 | Bowed figures, \"enchained\" |\n| 04 | 00:03:23.8 | Gandhi, close, head bowed |\n| 05 | 00:03:25.2 | Gandhi walking among followers |\n| 06 | 00:14:30.9 | Vast crowd before temple gopurams |\n| 07 | 00:07:54.0 | Nehru in profile |\n| 08 | 00:19:35.5 | Crowds streaming down the steps |\n\n## Reproducible script — `make_opening.sh`\nRuns end-to-end (`./make_opening.sh`), creates folders, **errors clearly if ffmpeg/ffprobe are missing**, auto-finds the video, runs scene detection + contact sheets, synthesizes the radio bed (ffmpeg-only: 50/100 Hz hum + filtered pink-noise static, low at ~−25 dB), renders text, and assembles. Modes: `scan`, `build` (default), `candidates`.\n- Swap the hero shot anytime: `ARCH_START=186.0 ./make_opening.sh` (or copy a candidate over the final).\n\n## Two things worth knowing\n1. **[REDACTED:pii.name] ffmpeg lacks `drawtext`** (no libfreetype). Rather than reinstall it (you've a `prompt-to-reel` project depending on it), I render text with **Pillow → transparent PNG → ffmpeg `overlay`** (cleaner typography anyway, Georgia serif). The script auto-detects and uses `drawtext` if a future ffmpeg has it.\n2. The source has **burned-in English subtitles + an \"fsh\" logo** along the bottom — I crop the bottom band out before reframing, so they never clash with the captions, and **no watermark is added**."
+      },
+      {
+        "turn_index": 31,
+        "text": "Playing now in your default player (QuickTime). It's a 5-second clip, so it'll go by quickly — scrub back to watch the slow zoom and the audio fade.\n\nWant me to also open the **candidates folder** so you can A/B them, or open a specific alternate (e.g., the Gandhi or chains cut)?"
+      }
+    ],
+    "tool_calls": [
+      {
+        "turn_index": 0,
+        "name": "Bash",
+        "text": "{\"command\":\"echo \\\"=== ffmpeg ===\\\" \\u0026\\u0026 which ffmpeg \\u0026\\u0026 ffmpeg -version | head -1; echo \\\"=== ffprobe ===\\\" \\u0026\\u0026 which ffprobe \\u0026\\u0026 ffprobe -version | head -1\",\"description\":\"Check ffmpeg and ffprobe availability\"}"
+      },
+      {
+        "turn_index": 1,
+        "name": "Bash",
+        "text": "{\"command\":\"ls -lah ~/Downloads/ | grep -iE '\\\\.(mp4|mov|mkv|avi|webm|m4v|flv|wmv|mpg|mpeg|ts)$' || echo \\\"No obvious video files found at top level of Downloads\\\"\",\"description\":\"List video files in Downloads\"}"
+      },
+      {
+        "turn_index": 2,
+        "name": "Bash",
+        "text": "{\"command\":\"echo \\\"=== Recursive video search in Downloads (name + size) ===\\\"\\nfind ~/Downloads -type f \\\\( -iname '*.mp4' -o -iname '*.mov' -o -iname '*.mkv' -o -iname '*.avi' -o -iname '*.webm' -o -iname '*.m4v' -o -iname '*.flv' -o -iname '*.wmv' -o -iname '*.mpg' -o -iname '*.mpeg' -o -iname '*.ts' \\\\) 2\\u003e/dev/null -exec ls -laS {} + | sort -k5 -hr\\necho\\necho \\\"=== Anything matching india / independ / archival anywhere obvious ===\\\"\\nfind ~/Downloads ~/Movies ~/Desktop -type f \\\\( -iname '*india*' -o -iname '*independ*' -o -iname '*archival*' -o -iname '*archive*' \\\\) 2\\u003e/dev/null\",\"description\":\"Recursively search [REDACTED:secret.entropy] for the India video\"}"
+      },
+      {
+        "turn_index": 3,
+        "name": "Bash",
+        "text": "{\"command\":\"SRC=\\\"/[REDACTED:secret.entropy]/[REDACTED:pii.name] Ministry of [REDACTED:pii.name] Division .mp4\\\"\\necho \\\"=== Format ===\\\"\\nffprobe -v error -show_entries format=duration,size,bit_rate,format_long_name -of default=noprint_wrappers=1 \\\"$SRC\\\"\\necho\\necho \\\"=== Video stream ===\\\"\\nffprobe -v error -select_streams v:0 -show_entries stream=codec_name,width,height,r_frame_rate,avg_frame_rate,pix_fmt,duration -of default=noprint_wrappers=1 \\\"$SRC\\\"\\necho\\necho \\\"=== Audio stream ===\\\"\\nffprobe -v error -select_streams a:0 -show_entries stream=codec_name,channels,sample_rate,channel_layout -of default=noprint_wrappers=1 \\\"$SRC\\\"\",\"description\":\"ffprobe duration and stream info of source\"}"
+      },
+      {
+        "turn_index": 4,
+        "name": "Bash",
+        "text": "{\"command\":\"echo \\\"=== Required filters present? ===\\\"\\nffmpeg -hide_banner -filters 2\\u003e/dev/null | grep -wE 'drawtext|zoompan|noise|vignette|tile|colorbalance|eq|curves|sine|anoisesrc|amix|afade|vibrato|format' | awk '{print $2}' | sort | tr '\\\\n' ' '\\necho\\necho \\\"=== drawtext config (libfreetype) ===\\\"\\nffmpeg -hide_banner -h filter=drawtext \\u003e/dev/null 2\\u003e\\u00261 \\u0026\\u0026 echo \\\"drawtext OK\\\" || echo \\\"drawtext MISSING\\\"\\necho\\necho \\\"=== Candidate fonts that actually exist ===\\\"\\nfor f in \\\\\\n  \\\"/[REDACTED:secret.entropy].ttf\\\" \\\\\\n  \\\"/[REDACTED:secret.entropy]/[REDACTED:pii.name] Roman.ttf\\\" \\\\\\n  \\\"/[REDACTED:secret.entropy].ttc\\\" \\\\\\n  \\\"/[REDACTED:secret.entropy].ttf\\\" \\\\\\n  \\\"/[REDACTED:secret.entropy].ttc\\\" \\\\\\n  \\\"/[REDACTED:secret.entropy].ttf\\\" \\\\\\n  \\\"/[REDACTED:secret.entropy].ttf\\\" \\\\\\n  \\\"/[REDACTED:secret.entropy].ttf\\\" \\\\\\n  \\\"/[REDACTED:secret.entropy].ttf\\\" \\\\\\n  \\\"/[REDACTED:secret.entropy].ttf\\\" ; do\\n  [ -f \\\"$f\\\" ] \\u0026\\u0026 echo \\\"FOUND: $f\\\"\\ndone\",\"description\":\"Verify ffmpeg filters and detect usable fonts\"}"
+      },
+      {
+        "turn_index": 5,
+        "name": "Bash",
+        "text": "{\"command\":\"PROJ=\\\"$HOME/Downloads/ai_india_opening\\\"\\nmkdir -p \\\"$PROJ/work/scene_thumbs\\\" \\\"$PROJ/work/contact_sheets\\\" \\\"$PROJ/candidates\\\" \\\"$[REDACTED:secret.entropy]\\\"\\necho \\\"Project dir: $PROJ\\\"\\nls -la \\\"$PROJ\\\"\",\"description\":\"Create project directory structure\"}"
+      },
+      {
+        "turn_index": 6,
+        "name": "Bash",
+        "text": "{\"command\":\"SRC=\\\"/[REDACTED:secret.entropy]/[REDACTED:pii.name] Ministry of [REDACTED:pii.name] Division .mp4\\\"\\nPROJ=\\\"$HOME/Downloads/ai_india_opening\\\"\\nFONT=\\\"/[REDACTED:secret.entropy].ttf\\\"\\nTH=\\\"$PROJ/work/scene_thumbs\\\"; CS=\\\"$PROJ/work/contact_sheets\\\"\\nrm -f \\\"$PROJ/work/_extract.done\\\"\\n\\necho \\\"[1/4] scene-change thumbnails (scene\\u003e0.25) ...\\\"\\nffmpeg -hide_banner -y -an -i \\\"$SRC\\\" \\\\\\n  -vf \\\"select='gt(scene,0.25)',scale=360:-1,drawtext=fontfile=$FONT:text='%{pts\\\\:hms}':x=8:y=8:fontsize=20:fontcolor=yellow:box=1:boxcolor=black@0.55:boxborderw=4\\\" \\\\\\n  -fps_mode vfr -q:v 3 \\\"$TH/scene_%04d.jpg\\\" 2\\u003e \\\"$PROJ/work/scene_detect.log\\\" \\\\\\n\\u0026\\u0026 echo \\\"    scenes: $(ls \\\"$TH\\\"/scene_*.jpg 2\\u003e/dev/null | wc -l | tr -d ' ')\\\"\\n\\necho \\\"[2/4] fallback grid thumbnails (every 10s) ...\\\"\\nffmpeg -hide_banner -y -an -i \\\"$SRC\\\" \\\\\\n  -vf \\\"fps=1/10,scale=360:-1,drawtext=fontfile=$FONT:text='%{pts\\\\:hms}':x=8:y=8:fontsize=20:fontcolor=cyan:box=1:boxcolor=black@0.55:boxborderw=4\\\" \\\\\\n  -fps_mode vfr -q:v 3 \\\"$TH/grid_%04d.jpg\\\" 2\\u003e \\\"$PROJ/work/grid.log\\\" \\\\\\n\\u0026\\u0026 echo \\\"    grid frames: $(ls \\\"$TH\\\"/grid_*.jpg 2\\u003e/dev/null | wc -l | tr -d ' ')\\\"\\n\\necho \\\"[3/4] contact sheets (scene, 5x6/page) ...\\\"\\nffmpeg -hide_banner -y -framerate 1 -i \\\"$TH/scene_%04d.jpg\\\" \\\\\\n  -vf \\\"tile=5x6:margin=10:padding=8:color=0x101014\\\" -q:v 3 \\\\\\n  \\\"$CS/scene_contact_%03d.jpg\\\" 2\\u003e \\\"$PROJ/work/contact_scene.log\\\" || true\\n\\necho \\\"[4/4] contact sheets (grid, 5x6/page) ...\\\"\\nffmpeg -hide_banner -y -framerate 1 -i \\\"$TH/grid_%04d.jpg\\\" \\\\\\n  -vf \\\"tile=5x6:margin=10:padding=8:color=0x101014\\\" -q:v 3 \\\\\\n  \\\"$CS/grid_contact_%03d.jpg\\\" 2\\u003e \\\"$PROJ/work/contact_grid.log\\\" || true\\n\\necho \\\"DONE\\\" \\u003e \\\"$PROJ/work/_extract.done\\\"\\necho \\\"EXTRACTION COMPLETE: scenes + grid + contact sheets\\\"\",\"description\":\"Background: scene detection, grid frames, contact sheets\",\"run_in_background\":true}"
+      },
+      {
+        "turn_index": 7,
+        "name": "Bash",
+        "text": "{\"command\":\"PROJ=\\\"$HOME/Downloads/ai_india_opening\\\"\\nSEG=\\\"$[REDACTED:secret.entropy]\\\"; mkdir -p \\\"$SEG\\\"\\n# --- Synthetic radio hum + static bed (5.0s), ffmpeg-only ---\\nffmpeg -hide_banner -y \\\\\\n -f lavfi -i \\\"sine=frequency=50:sample_rate=44100:duration=5\\\" \\\\\\n -f lavfi -i \\\"sine=frequency=100:sample_rate=44100:duration=5\\\" \\\\\\n -f lavfi -i \\\"anoisesrc=color=pink:sample_rate=44100:duration=5:amplitude=0.6\\\" \\\\\\n -filter_complex \\\"\\\\\\n   [0:a]volume=0.22[h1];\\\\\\n   [1:a]volume=0.07[h2];\\\\\\n   [2:a]highpass=f=180,lowpass=f=3200,volume=0.12,tremolo=f=0.4:d=0.4[ns];\\\\\\n   [h1][h2]amix=inputs=2:normalize=0[hum];\\\\\\n   [hum]vibrato=f=0.25:d=0.18[humv];\\\\\\n   [humv][ns]amix=inputs=2:normalize=0,\\\\\\n     afade=t=in:st=0:d=0.5,afade=t=out:st=4.5:d=0.5,\\\\\\n     alimiter=limit=0.35[a]\\\" \\\\\\n -map \\\"[a]\\\" -t 5 -c:a pcm_s16le \\\"$SEG/radio_bed.wav\\\" 2\\u003e\\\"$PROJ/work/audio.log\\\" \\u0026\\u0026 echo \\\"audio bed built\\\"\\necho \\\"=== level check ===\\\"\\nffmpeg -hide_banner -i \\\"$SEG/radio_bed.wav\\\" -af volumedetect -f null - 2\\u003e\\u00261 | grep -E 'mean_volume|max_volume'\",\"description\":\"Build synthetic radio bed and measure loudness\"}"
+      },
+      {
+        "turn_index": 8,
+        "name": "Bash",
+        "text": "{\"command\":\"PROJ=\\\"$HOME/Downloads/ai_india_opening\\\"\\nSEG=\\\"$[REDACTED:secret.entropy]\\\"\\nFONT=\\\"/[REDACTED:secret.entropy].ttf\\\"\\n# --- Segment 1: pure black + centered title (1.2s, silent) ---\\nffmpeg -hide_banner -y \\\\\\n -f lavfi -i \\\"color=c=black:s=1080x1920:r=30:d=1.2\\\" \\\\\\n -vf \\\"drawtext=fontfile=$FONT:text='India was not born powerful.':fontcolor=0xEAEAEA@0.9:fontsize=60:x=(w-text_w)/2:y=(h-text_h)/2:alpha='if(lt(t,0.35),t/0.35,1)':shadowcolor=black@0.5:shadowx=2:shadowy=2,format=yuv420p\\\" \\\\\\n -r 30 -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p \\\"$SEG/seg1.mp4\\\" 2\\u003e\\\"$PROJ/work/seg1.log\\\" \\u0026\\u0026 echo \\\"seg1 built\\\"\\nffmpeg -hide_banner -y -ss 0.8 -i \\\"$SEG/seg1.mp4\\\" -frames:v 1 \\\"$PROJ/work/seg1_check.jpg\\\" 2\\u003e/dev/null \\u0026\\u0026 echo \\\"frame extracted\\\"\\nffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,pix_fmt -show_entries format=duration -of default=noprint_wrappers=1 \\\"$SEG/seg1.mp4\\\"\",\"description\":\"Build segment 1 black title card and extract verify frame\"}"
+      },
+      {
+        "turn_index": 9,
+        "name": "Bash",
+        "text": "{\"command\":\"PROJ=\\\"$HOME/Downloads/ai_india_opening\\\"\\necho \\\"=== seg1.log (tail) ===\\\"\\ntail -n 25 \\\"$PROJ/work/seg1.log\\\"\\necho\\necho \\\"=== libx264 present? ===\\\"\\nffmpeg -hide_banner -encoders 2\\u003e/dev/null | grep -E 'libx264|libx265| aac ' | head\",\"description\":\"Inspect seg1 failure log and check encoders\"}"
+      },
+      {
+        "turn_index": 10,
+        "name": "Bash",
+        "text": "{\"command\":\"PROJ=\\\"$HOME/Downloads/ai_india_opening\\\"\\necho \\\"=== background extraction output ===\\\"\\ncat \\\"/[REDACTED:secret.entropy]-501/-Users-atharva-[REDACTED:secret.entropy]-a29d-4d27-8b67-[REDACTED:secret.entropy].output\\\"\\necho\\necho \\\"=== counts ===\\\"\\necho \\\"scene thumbs: $(ls \\\"$PROJ\\\"/work/scene_thumbs/scene_*.jpg 2\\u003e/dev/null | wc -l | tr -d ' ')\\\"\\necho \\\"grid thumbs:  $(ls \\\"$PROJ\\\"/work/scene_thumbs/grid_*.jpg 2\\u003e/dev/null | wc -l | tr -d ' ')\\\"\\necho \\\"scene sheets: $(ls \\\"$PROJ\\\"/work/contact_sheets/scene_contact_*.jpg 2\\u003e/dev/null | wc -l | tr -d ' ')\\\"\\necho \\\"grid sheets:  $(ls \\\"$PROJ\\\"/work/contact_sheets/grid_contact_*.jpg 2\\u003e/dev/null | wc -l | tr -d ' ')\\\"\\nls -la \\\"$PROJ\\\"/work/contact_sheets/ 2\\u003e/dev/null | head\",\"description\":\"Read scene scan output and count artifacts\"}"
+      },
+      {
+        "turn_index": 11,
+        "name": "Bash",
+        "text": "{\"command\":\"echo \\\"=== text-capable filters in this ffmpeg ===\\\"\\nffmpeg -hide_banner -filters 2\\u003e/dev/null | grep -iE 'drawtext|subtitles| ass |drawbox|overlay' || echo \\\"(none of drawtext/subtitles/ass found)\\\"\\necho\\necho \\\"=== buildconf: freetype / fontconfig / libass / harfbuzz ===\\\"\\nffmpeg -hide_banner -buildconf 2\\u003e/dev/null | grep -iE 'freetype|fontconfig|libass|harfbuzz|drawtext' || echo \\\"(no [REDACTED:secret.entropy] in build flags)\\\"\\necho\\necho \\\"=== brew ffmpeg ===\\\"\\nbrew list --versions ffmpeg 2\\u003e/dev/null || echo \\\"ffmpeg not a brew formula?\\\"\\necho \\\"tap clue:\\\"; readlink -f \\\"$(which ffmpeg)\\\" 2\\u003e/dev/null\",\"description\":\"Confirm drawtext absence and inspect ffmpeg build config\"}"
+      },
+      {
+        "turn_index": 12,
+        "name": "Bash",
+        "text": "{\"command\":\"echo \\\"=== ImageMagick? ===\\\"\\n(which magick || which convert) 2\\u003e/dev/null \\u0026\\u0026 { (magick -version 2\\u003e/dev/null || convert -version 2\\u003e/dev/null) | grep -iE 'Version|freetype|fontconfig'; } || echo \\\"no ImageMagick\\\"\\necho\\necho \\\"=== Python PIL/Pillow? ===\\\"\\npython3 -c \\\"import PIL, PIL.ImageFont; print('Pillow', PIL.__version__, 'OK')\\\" 2\\u003e/dev/null || echo \\\"no Pillow\\\"\\necho\\necho \\\"=== other ffmpeg builds on PATH/system ===\\\"\\nls -la /[REDACTED:secret.entropy]* /[REDACTED:secret.entropy]* /[REDACTED:secret.entropy]* 2\\u003e/dev/null\\necho \\\"any drawtext-enabled ffmpeg via mdfind:\\\"; mdfind -name ffmpeg 2\\u003e/dev/null | grep -i ffmpeg | grep -vE 'proofswe|node_modules' | head\",\"description\":\"Check ImageMagick, Pillow, and alternate ffmpeg builds\"}"
+      },
+      {
+        "turn_index": 13,
+        "name": "Write",
+        "text": "{\"content\":\"#!/usr/bin/env python3\\n\\\"\\\"\\\"Render a transparent 1080x1920 PNG text card (cinematic captions).\\n\\nUsed as a fallback when ffmpeg has no drawtext filter (no libfreetype).\\nPillow ships its own freetype, so it can rasterize system fonts directly.\\n\\nExample:\\n  python3 mktext.py --text \\\"India was not born powerful.\\\" \\\\\\n      --out title.png --size 62 --pos center --tracking 3 --shadow 22\\n\\\"\\\"\\\"\\nimport argparse, sys\\nfrom PIL import Image, ImageDraw, ImageFont, ImageFilter\\n\\nW, H = 1080, 1920\\n\\nFONT_CANDIDATES = [\\n    \\\"/[REDACTED:secret.entropy].ttf\\\",\\n    \\\"/[REDACTED:secret.entropy]/[REDACTED:pii.name] Roman.ttf\\\",\\n    \\\"/[REDACTED:secret.entropy].ttc\\\",\\n    \\\"/[REDACTED:secret.entropy].ttf\\\",\\n    \\\"/[REDACTED:secret.entropy].ttc\\\",\\n    \\\"/[REDACTED:secret.entropy].ttf\\\",\\n    \\\"/[REDACTED:secret.entropy].ttf\\\",\\n    \\\"/[REDACTED:secret.entropy].ttf\\\",\\n]\\n\\n\\ndef load_font(size, explicit=None):\\n    paths = ([explicit] if explicit else []) + FONT_CANDIDATES\\n    for p in paths:\\n        try:\\n            return ImageFont.truetype(p, size), p\\n        except Exception:\\n            continue\\n    return ImageFont.load_default(), \\\"PIL-default\\\"\\n\\n\\ndef text_width(font, s, tracking):\\n    if not s:\\n        return 0\\n    w = sum(font.getbbox(ch)[2] for ch in s) if tracking else font.getbbox(s)[2]\\n    if tracking:\\n        w += tracking * (len(s) - 1)\\n    return w\\n\\n\\ndef wrap(font, s, tracking, maxw):\\n    words, lines, cur = s.split(\\\" \\\"), [], \\\"\\\"\\n    for w in words:\\n        trial = (cur + \\\" \\\" + w).strip()\\n        if text_width(font, trial, tracking) \\u003c= maxw or not cur:\\n            cur = trial\\n        else:\\n            lines.append(cur)\\n            cur = w\\n    if cur:\\n        lines.append(cur)\\n    return lines\\n\\n\\ndef draw_line(draw, x, y, s, font, fill, tracking):\\n    if not tracking:\\n        draw.text((x, y), s, font=font, fill=fill)\\n        return\\n    cx = x\\n    for ch in s:\\n        draw.text((cx, y), ch, font=font, fill=fill)\\n        cx += font.getbbox(ch)[2] + tracking\\n\\n\\ndef main():\\n    ap = argparse.ArgumentParser()\\n    ap.add_argument(\\\"--text\\\", required=True)\\n    ap.add_argument(\\\"--out\\\", required=True)\\n    ap.add_argument(\\\"--size\\\", type=int, default=60)\\n    ap.add_argument(\\\"--font\\\", default=None)\\n    ap.add_argument(\\\"--pos\\\", default=\\\"center\\\", help=\\\"center | lower | \\u003cint y\\u003e\\\")\\n    ap.add_argument(\\\"--color\\\", default=\\\"234,234,234\\\")\\n    ap.add_argument(\\\"--alpha\\\", type=float, default=0.92)\\n    ap.add_argument(\\\"--tracking\\\", type=int, default=2)\\n    ap.add_argument(\\\"--shadow\\\", type=int, default=18, help=\\\"soft-shadow blur radius; 0=off\\\")\\n    ap.add_argument(\\\"--maxw\\\", type=int, default=960)\\n    ap.add_argument(\\\"--leading\\\", type=float, default=1.28)\\n    args = ap.parse_args()\\n\\n    font, used = load_font(args.size, args.font)\\n    r, g, b = (int(v) for v in args.color.split(\\\",\\\"))\\n    a = int(max(0.0, min(1.0, args.alpha)) * 255)\\n\\n    # shrink-to-fit so even long lines never exceed the safe width\\n    while text_width(font, args.text, args.tracking) \\u003e args.maxw and args.size \\u003e 24 and not args.text.count(\\\" \\\"):\\n        args.size -= 2\\n        font, used = load_font(args.size, args.font)\\n    lines = wrap(font, args.text, args.tracking, args.maxw)\\n\\n    asc, desc = font.getmetrics()\\n    line_h = int((asc + desc) * args.leading)\\n    block_h = line_h * len(lines)\\n\\n    if args.pos == \\\"center\\\":\\n        y0 = (H - block_h) // 2\\n    elif args.pos == \\\"lower\\\":\\n        y0 = int(H * 0.80) - block_h // 2   # caption band, clear of reels UI\\n    else:\\n        y0 = int(args.pos)\\n\\n    img = Image.new(\\\"RGBA\\\", (W, H), (0, 0, 0, 0))\\n    draw = ImageDraw.Draw(img)\\n\\n    # soft drop shadow on its own layer (legibility over footage)\\n    if args.shadow \\u003e 0:\\n        sh = Image.new(\\\"RGBA\\\", (W, H), (0, 0, 0, 0))\\n        sd = ImageDraw.Draw(sh)\\n        for i, ln in enumerate(lines):\\n            lw = text_width(font, ln, args.tracking)\\n            x = (W - lw) // 2\\n            draw_line(sd, x + 2, y0 + i * line_h + 3, ln, font, (0, 0, 0, 200), args.tracking)\\n        sh = sh.filter(ImageFilter.GaussianBlur(args.shadow))\\n        img = Image.alpha_composite(img, sh)\\n        draw = ImageDraw.Draw(img)\\n\\n    for i, ln in enumerate(lines):\\n        lw = text_width(font, ln, args.tracking)\\n        x = (W - lw) // 2\\n        draw_line(draw, x, y0 + i * line_h, ln, font, (r, g, b, a), args.tracking)\\n\\n    img.save(args.out)\\n    print(f\\\"wrote {args.out}  font={used} size={args.size} lines={len(lines)}\\\")\\n\\n\\nif __name__ == \\\"__main__\\\":\\n    sys.exit(main())\\n\",\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/mktext.py\"}"
+      },
+      {
+        "turn_index": 14,
+        "name": "Write",
+        "text": "{\"content\":\"#!/usr/bin/env python3\\n\\\"\\\"\\\"Build labeled contact sheets from extracted thumbnails.\\n\\nEach cell shows the thumbnail with its source timestamp burned in the corner,\\nso a reviewer (human or model) can pick a strong segment and read its time.\\n\\n  scene mode: timestamps parsed from ffmpeg showinfo log (pts_time:)\\n  grid  mode: timestamp = (index-1) * interval seconds\\n\\\"\\\"\\\"\\nimport argparse, glob, os, re, sys\\nfrom PIL import Image, ImageDraw, ImageFont\\n\\nFONTS = [\\n    \\\"/[REDACTED:secret.entropy].ttf\\\",\\n    \\\"/[REDACTED:secret.entropy].ttc\\\",\\n    \\\"/[REDACTED:secret.entropy].ttf\\\",\\n]\\n\\n\\ndef load_font(sz):\\n    for p in FONTS:\\n        try:\\n            return ImageFont.truetype(p, sz)\\n        except Exception:\\n            pass\\n    return ImageFont.load_default()\\n\\n\\ndef hms(t):\\n    t = float(t)\\n    h = int(t // 3600); m = int((t % 3600) // 60); s = t % 60\\n    return f\\\"{h:02d}:{m:02d}:{s:06.3f}\\\"\\n\\n\\ndef scene_times(logpath):\\n    out = []\\n    with open(logpath, errors=\\\"ignore\\\") as f:\\n        for line in f:\\n            m = re.search(r\\\"pts_time:([0-9.]+)\\\", line)\\n            if m:\\n                out.append(float(m.group(1)))\\n    return out\\n\\n\\ndef main():\\n    ap = argparse.ArgumentParser()\\n    ap.add_argument(\\\"--dir\\\", required=True)\\n    ap.add_argument(\\\"--pattern\\\", required=True, help=\\\"e.g. scene_*.jpg\\\")\\n    ap.add_argument(\\\"--mode\\\", choices=[\\\"scene\\\", \\\"grid\\\"], required=True)\\n    ap.add_argument(\\\"--log\\\", default=None)\\n    ap.add_argument(\\\"--interval\\\", type=float, default=10.0)\\n    ap.add_argument(\\\"--out\\\", required=True, help=\\\"output prefix\\\")\\n    ap.add_argument(\\\"--cols\\\", type=int, default=5)\\n    ap.add_argument(\\\"--rows\\\", type=int, default=6)\\n    args = ap.parse_args()\\n\\n    thumbs = sorted(glob.glob(os.path.join(args.dir, args.pattern)))\\n    if not thumbs:\\n        print(f\\\"no thumbs matching {args.pattern}\\\", file=sys.stderr)\\n        return 1\\n\\n    if args.mode == \\\"scene\\\":\\n        times = scene_times(args.log) if args.log and os.path.exists(args.log) else []\\n    else:\\n        times = [(i) * args.interval for i in range(len(thumbs))]\\n\\n    probe = Image.open(thumbs[0]); cw, ch = probe.size\\n    pad, lab = 8, 24\\n    cell_w, cell_h = cw + pad * 2, ch + pad * 2 + lab\\n    per = args.cols * args.rows\\n    font = load_font(20)\\n\\n    n_sheets = (len(thumbs) + per - 1) // per\\n    for s in range(n_sheets):\\n        sheet = Image.new(\\\"RGB\\\", (cell_w * args.cols, cell_h * args.rows), (16, 16, 20))\\n        d = ImageDraw.Draw(sheet)\\n        for k in range(per):\\n            idx = s * per + k\\n            if idx \\u003e= len(thumbs):\\n                break\\n            im = Image.open(thumbs[idx]).convert(\\\"RGB\\\")\\n            cx = (k % args.cols) * cell_w + pad\\n            cy = (k // args.cols) * cell_h + pad\\n            sheet.paste(im, (cx, cy))\\n            t = times[idx] if idx \\u003c len(times) else None\\n            tag = f\\\"#{idx+1}  {hms(t)}\\\" if t is not None else f\\\"#{idx+1}  (no ts)\\\"\\n            d.rectangle([cx, cy + ch, cx + cw, cy + ch + lab], fill=(0, 0, 0))\\n            d.text((cx + 4, cy + ch + 2), tag, fill=(255, 220, 70), font=font)\\n        outp = f\\\"{args.out}_{s+1:03d}.jpg\\\"\\n        sheet.save(outp, quality=88)\\n        print(f\\\"wrote {outp} ({min(per, len(thumbs)-s*per)} cells)\\\")\\n    print(f\\\"{len(thumbs)} thumbs -\\u003e {n_sheets} sheet(s)\\\")\\n\\n\\nif __name__ == \\\"__main__\\\":\\n    sys.exit(main())\\n\",\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/contact.py\"}"
+      },
+      {
+        "turn_index": 15,
+        "name": "Bash",
+        "text": "{\"command\":\"SRC=\\\"/[REDACTED:secret.entropy]/[REDACTED:pii.name] Ministry of [REDACTED:pii.name] Division .mp4\\\"\\nPROJ=\\\"$HOME/Downloads/ai_india_opening\\\"\\nTH=\\\"$PROJ/work/scene_thumbs\\\"; CS=\\\"$PROJ/work/contact_sheets\\\"\\nrm -f \\\"$TH\\\"/*.jpg \\\"$CS\\\"/*.jpg \\\"$PROJ/work/_extract.done\\\" 2\\u003e/dev/null\\n\\necho \\\"[1/4] scene thumbs (scene\\u003e0.25) + showinfo timestamps ...\\\"\\nffmpeg -hide_banner -y -an -i \\\"$SRC\\\" \\\\\\n  -vf \\\"select='gt(scene,0.25)',showinfo,scale=360:-1\\\" \\\\\\n  -fps_mode vfr -q:v 3 \\\"$TH/scene_%04d.jpg\\\" 2\\u003e \\\"$PROJ/work/scene_detect.log\\\"\\necho \\\"    scene thumbs: $(ls \\\"$TH\\\"/scene_*.jpg 2\\u003e/dev/null | wc -l | tr -d ' ')\\\"\\n\\necho \\\"[2/4] grid thumbs (every 10s) ...\\\"\\nffmpeg -hide_banner -y -an -i \\\"$SRC\\\" \\\\\\n  -vf \\\"fps=1/10,scale=360:-1\\\" -fps_mode vfr -q:v 3 \\\"$TH/grid_%04d.jpg\\\" 2\\u003e \\\"$PROJ/work/grid.log\\\"\\necho \\\"    grid thumbs: $(ls \\\"$TH\\\"/grid_*.jpg 2\\u003e/dev/null | wc -l | tr -d ' ')\\\"\\n\\necho \\\"[3/4] labeled contact sheets (scene) ...\\\"\\npython3 \\\"$[REDACTED:secret.entropy].py\\\" --dir \\\"$TH\\\" --pattern 'scene_*.jpg' --mode scene \\\\\\n  --log \\\"$PROJ/work/scene_detect.log\\\" --out \\\"$CS/scene_contact\\\" --cols 5 --rows 6\\n\\necho \\\"[4/4] labeled contact sheets (grid) ...\\\"\\npython3 \\\"$[REDACTED:secret.entropy].py\\\" --dir \\\"$TH\\\" --pattern 'grid_*.jpg' --mode grid \\\\\\n  --interval 10 --out \\\"$CS/grid_contact\\\" --cols 5 --rows 6\\n\\necho \\\"DONE\\\" \\u003e \\\"$PROJ/work/_extract.done\\\"\\necho \\\"EXTRACTION+SHEETS COMPLETE\\\"\",\"description\":\"Background: re-extract thumbs (no drawtext) + build labeled contact sheets\",\"run_in_background\":true}"
+      },
+      {
+        "turn_index": 16,
+        "name": "Bash",
+        "text": "{\"command\":\"PROJ=\\\"$HOME/Downloads/ai_india_opening\\\"\\nSEG=\\\"$[REDACTED:secret.entropy]\\\"; TX=\\\"$PROJ/work/text\\\"; mkdir -p \\\"$TX\\\"\\necho \\\"=== render 3 text cards (Pillow) ===\\\"\\npython3 \\\"$[REDACTED:secret.entropy].py\\\" --text \\\"India was not born powerful.\\\" --out \\\"$TX/title.png\\\"   --size 62 --pos center --tracking 3 --shadow 20 --color 234,234,234 --alpha 0.92\\npython3 \\\"$[REDACTED:secret.entropy].py\\\" --text \\\"It inherited dependence.\\\"     --out \\\"$TX/caption.png\\\" --size 46 --pos lower  --tracking 2 --shadow 26 --color 220,224,232 --alpha 0.96\\npython3 \\\"$[REDACTED:secret.entropy].py\\\" --text \\\"Then it chose to build.\\\"      --out \\\"$TX/final.png\\\"   --size 60 --pos center --tracking 3 --shadow 20 --color 245,245,245 --alpha 0.97\\necho\\necho \\\"=== seg1: black + title overlay (Pillow PNG) ===\\\"\\nffmpeg -hide_banner -y \\\\\\n -f lavfi -i \\\"color=c=black:s=1080x1920:r=30:d=1.2\\\" \\\\\\n -loop 1 -t 1.2 -i \\\"$TX/title.png\\\" \\\\\\n -filter_complex \\\"[1]format=rgba,fade=t=in:st=0:d=0.4:alpha=1[t];[0][t]overlay=0:0:format=auto,format=yuv420p[v]\\\" \\\\\\n -map \\\"[v]\\\" -r 30 -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p \\\"$SEG/seg1.mp4\\\" 2\\u003e\\\"$PROJ/work/seg1.log\\\" \\\\\\n \\u0026\\u0026 echo \\\"seg1 OK\\\" || { echo \\\"seg1 FAILED\\\"; tail -5 \\\"$PROJ/work/seg1.log\\\"; }\\nffmpeg -hide_banner -y -ss 0.8 -i \\\"$SEG/seg1.mp4\\\" -frames:v 1 \\\"$PROJ/work/seg1_check.jpg\\\" 2\\u003e/dev/null \\u0026\\u0026 echo \\\"verify frame ready\\\"\",\"description\":\"Render text cards via Pillow and rebuild seg1 with overlay\"}"
+      },
+      {
+        "turn_index": 17,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/seg1_check.jpg\"}"
+      },
+      {
+        "turn_index": 18,
+        "name": "Bash",
+        "text": "{\"command\":\"PROJ=\\\"$HOME/Downloads/ai_india_opening\\\"\\necho \\\"=== bg task output so far ===\\\"\\ncat \\\"/[REDACTED:secret.entropy]-501/-Users-atharva-[REDACTED:secret.entropy]-a29d-4d27-8b67-[REDACTED:secret.entropy].output\\\" 2\\u003e/dev/null\\necho\\necho \\\"done marker: $([ -f \\\"$PROJ/work/_extract.done\\\" ] \\u0026\\u0026 echo YES || echo 'not yet')\\\"\\necho \\\"scene thumbs so far: $(ls \\\"$PROJ\\\"/work/scene_thumbs/scene_*.jpg 2\\u003e/dev/null | wc -l | tr -d ' ')\\\"\\necho \\\"grid thumbs so far:  $(ls \\\"$PROJ\\\"/work/scene_thumbs/grid_*.jpg 2\\u003e/dev/null | wc -l | tr -d ' ')\\\"\",\"description\":\"Check background extraction progress\"}"
+      },
+      {
+        "turn_index": 19,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/contact_sheets/grid_contact_001.jpg\"}"
+      },
+      {
+        "turn_index": 20,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/contact_sheets/grid_contact_002.jpg\"}"
+      },
+      {
+        "turn_index": 21,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/contact_sheets/grid_contact_003.jpg\"}"
+      },
+      {
+        "turn_index": 22,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/contact_sheets/grid_contact_004.jpg\"}"
+      },
+      {
+        "turn_index": 23,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/contact_sheets/scene_contact_001.jpg\"}"
+      },
+      {
+        "turn_index": 24,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/contact_sheets/scene_contact_002.jpg\"}"
+      },
+      {
+        "turn_index": 25,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/contact_sheets/scene_contact_003.jpg\"}"
+      },
+      {
+        "turn_index": 26,
+        "name": "Bash",
+        "text": "{\"command\":\"SRC=\\\"/[REDACTED:secret.entropy]/[REDACTED:pii.name] Ministry of [REDACTED:pii.name] Division .mp4\\\"\\nPROJ=\\\"$HOME/Downloads/ai_india_opening\\\"\\nC=\\\"$PROJ/work/cand\\\"; mkdir -p \\\"$C\\\"\\nextract() { ffmpeg -hide_banner -y -ss \\\"$1\\\" -i \\\"$SRC\\\" -frames:v 1 -q:v 2 \\\"$C/raw_${2}.jpg\\\" 2\\u003e/dev/null \\u0026\\u0026 echo \\\"  raw_${2}.jpg @ $1\\\"; }\\necho \\\"extracting raw candidate frames:\\\"\\nextract 158.5  A_0238_masses\\nextract 170.0  B_0250_masses\\nextract 180.0  C_0300_darkyears\\nextract 186.0  D_0306_masses\\nextract 203.5  E_0323_gandhi_walk\\nextract 288.7  F_0448_crowd_march\\nextract 870.9  G_1431_huge_crowd\\nls -la \\\"$C\\\"\",\"description\":\"Extract raw candidate frames at struggle/crowd timestamps\"}"
+      },
+      {
+        "turn_index": 27,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/cand/raw_A_0238_masses.jpg\"}"
+      },
+      {
+        "turn_index": 28,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/cand/raw_B_0250_masses.jpg\"}"
+      },
+      {
+        "turn_index": 29,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/cand/raw_C_0300_darkyears.jpg\"}"
+      },
+      {
+        "turn_index": 30,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/cand/raw_D_0306_masses.jpg\"}"
+      },
+      {
+        "turn_index": 31,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/cand/raw_E_0323_gandhi_walk.jpg\"}"
+      },
+      {
+        "turn_index": 32,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/cand/raw_F_0448_crowd_march.jpg\"}"
+      },
+      {
+        "turn_index": 33,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/cand/raw_G_1431_huge_crowd.jpg\"}"
+      },
+      {
+        "turn_index": 34,
+        "name": "Bash",
+        "text": "{\"command\":\"SRC=\\\"/[REDACTED:secret.entropy]/[REDACTED:pii.name] Ministry of [REDACTED:pii.name] Division .mp4\\\"\\nPROJ=\\\"$HOME/Downloads/ai_india_opening\\\"; C=\\\"$PROJ/work/cand\\\"\\n# Full cinematic look (no zoom/text): crop subs+logo (keep top 580), cover 9:16, dark-blue grade, grain, vignette\\nGRADE=\\\"crop=1280:580:0:0,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,eq=contrast=1.12:brightness=-0.06:gamma=0.92,colorbalance=rs=-0.06:gs=-0.02:bs=0.10:rm=-0.05:gm=-0.01:bm=0.08:rh=-0.04:bh=0.06,noise=alls=10:allf=t,vignette=angle=PI/4.2,format=yuv420p\\\"\\nprev() { ffmpeg -hide_banner -y -ss \\\"$1\\\" -i \\\"$SRC\\\" -frames:v 1 -vf \\\"$GRADE\\\" -q:v 2 \\\"$C/prev_${2}.jpg\\\" 2\\u003e/dev/null \\u0026\\u0026 echo \\\"  prev_${2}.jpg @ $1\\\"; }\\nprev 186.0 D_chains\\nprev 180.0 C_chains\\nprev 203.8 E_gandhi\\nprev 870.9 G_hugecrowd\\nprev 288.7 F_march\\necho \\\"done\\\"\",\"description\":\"Render fully-graded 9:16 previews of top candidates\"}"
+      },
+      {
+        "turn_index": 35,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/cand/prev_D_chains.jpg\"}"
+      },
+      {
+        "turn_index": 36,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/cand/prev_E_gandhi.jpg\"}"
+      },
+      {
+        "turn_index": 37,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/cand/prev_G_hugecrowd.jpg\"}"
+      },
+      {
+        "turn_index": 38,
+        "name": "Bash",
+        "text": "{\"command\":\"SRC=\\\"/[REDACTED:secret.entropy]/[REDACTED:pii.name] Ministry of [REDACTED:pii.name] Division .mp4\\\"\\nPROJ=\\\"$HOME/Downloads/ai_india_opening\\\"; C=\\\"$PROJ/work/cand\\\"\\n# Brighter, clearer grade so the chains read\\nGBR=\\\"crop=1280:580:0:0,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,eq=contrast=1.07:brightness=0.035:gamma=1.05,colorbalance=rs=-0.05:gs=-0.01:bs=0.09:rm=-0.04:bm=0.07:rh=-0.03:bh=0.05,noise=alls=9:allf=t,vignette=angle=PI/4.6,format=yuv420p\\\"\\n# Original moodier grade for footage\\nGMD=\\\"crop=1280:580:0:0,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,eq=contrast=1.12:brightness=-0.04:gamma=0.94,colorbalance=rs=-0.06:gs=-0.02:bs=0.10:rm=-0.05:bm=0.08:rh=-0.04:bh=0.06,noise=alls=10:allf=t,vignette=angle=PI/4.2,format=yuv420p\\\"\\nffmpeg -hide_banner -y -ss 180.0 -i \\\"$SRC\\\" -frames:v 1 -vf \\\"$GBR\\\" -q:v 2 \\\"$C/prev2_C_chains_bright.jpg\\\" 2\\u003e/dev/null \\u0026\\u0026 echo \\\"C bright\\\"\\nffmpeg -hide_banner -y -ss 184.0 -i \\\"$SRC\\\" -frames:v 1 -vf \\\"$GBR\\\" -q:v 2 \\\"$C/prev2_D2_chains_bright.jpg\\\" 2\\u003e/dev/null \\u0026\\u0026 echo \\\"D2 bright\\\"\\nffmpeg -hide_banner -y -ss 205.5 -i \\\"$SRC\\\" -frames:v 1 -vf \\\"$GMD\\\" -q:v 2 \\\"$C/prev2_gandhi8a.jpg\\\" 2\\u003e/dev/null \\u0026\\u0026 echo \\\"gandhi8a\\\"\\nffmpeg -hide_banner -y -ss 207.0 -i \\\"$SRC\\\" -frames:v 1 -vf \\\"$GMD\\\" -q:v 2 \\\"$C/prev2_gandhi8b.jpg\\\" 2\\u003e/dev/null \\u0026\\u0026 echo \\\"gandhi8b\\\"\",\"description\":\"Preview brighter chains grade and continuous Gandhi shot 8\"}"
+      },
+      {
+        "turn_index": 39,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/cand/prev2_C_chains_bright.jpg\"}"
+      },
+      {
+        "turn_index": 40,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/cand/prev2_gandhi8a.jpg\"}"
+      },
+      {
+        "turn_index": 41,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/cand/prev2_gandhi8b.jpg\"}"
+      },
+      {
+        "turn_index": 42,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/cand/prev_F_march.jpg\"}"
+      },
+      {
+        "turn_index": 43,
+        "name": "Bash",
+        "text": "{\"command\":\"SRC=\\\"/[REDACTED:secret.entropy]/[REDACTED:pii.name] Ministry of [REDACTED:pii.name] Division .mp4\\\"\\nPROJ=\\\"$HOME/Downloads/ai_india_opening\\\"; SEG=\\\"$[REDACTED:secret.entropy]\\\"; TX=\\\"$PROJ/work/text\\\"\\nOUT=\\\"$PROJ/ai_india_opening_0_5s.mp4\\\"\\nSTART=288.7\\n\\nffmpeg -hide_banner -y \\\\\\n -ss $START -t 3.2 -i \\\"$SRC\\\" \\\\\\n -framerate 30 -loop 1 -t 1.2 -i \\\"$TX/title.png\\\" \\\\\\n -framerate 30 -loop 1 -t 3.2 -i \\\"$TX/caption.png\\\" \\\\\\n -framerate 30 -loop 1 -t 0.6 -i \\\"$TX/final.png\\\" \\\\\\n -f lavfi -i \\\"color=c=black:s=1080x1920:r=30:d=1.2\\\" \\\\\\n -f lavfi -i \\\"color=c=black:s=1080x1920:r=30:d=0.6\\\" \\\\\\n -i \\\"$SEG/radio_bed.wav\\\" \\\\\\n -filter_complex \\\"\\\\\\n   [4]format=yuv420p[bg1]; \\\\\\n   [1]format=rgba,fade=t=in:st=0:d=0.4:alpha=1[t1]; \\\\\\n   [bg1][t1]overlay=0:0,format=yuv420p[s1]; \\\\\\n   [0]fps=30,crop=1280:580:0:0,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,\\\\\\n      scale=w='round(iw*(1+0.10*min(t/3.2\\\\,1))/2)*2':h='round(ih*(1+0.10*min(t/3.2\\\\,1))/2)*2':eval=frame,crop=1080:1920,\\\\\\n      eq=contrast=1.09:brightness=-0.02:gamma=0.98,\\\\\\n      colorbalance=rs=-0.05:gs=-0.01:bs=0.09:rm=-0.04:bm=0.07:rh=-0.03:bh=0.05,\\\\\\n      noise=alls=10:allf=t,vignette=angle=PI/4.4,fade=t=out:st=2.9:d=0.3,format=yuv420p[v2b]; \\\\\\n   [2]format=rgba,fade=t=in:st=0.35:d=0.5:alpha=1,fade=t=out:st=3.0:d=0.2:alpha=1[t2]; \\\\\\n   [v2b][t2]overlay=0:0,format=yuv420p[s2]; \\\\\\n   [5]format=yuv420p[bg3]; \\\\\\n   [3]format=rgba,fade=t=in:st=0.06:d=0.3:alpha=1[t3]; \\\\\\n   [bg3][t3]overlay=0:0,format=yuv420p[s3]; \\\\\\n   [s1][s2][s3]concat=n=3:v=1:a=0[v]\\\" \\\\\\n -map \\\"[v]\\\" -map 6:a -t 5 \\\\\\n -c:v libx264 -preset slow -crf 20 -pix_fmt yuv420p -r 30 \\\\\\n -c:a aac -b:a 192k -movflags +faststart \\\"$OUT\\\" 2\\u003e\\\"$[REDACTED:secret.entropy].log\\\" \\\\\\n \\u0026\\u0026 echo \\\"ASSEMBLED OK\\\" || { echo \\\"ASSEMBLE FAILED\\\"; tail -20 \\\"$[REDACTED:secret.entropy].log\\\"; }\\n\\necho \\\"=== probe ===\\\"\\nffprobe -v error -show_entries format=duration,size -show_entries stream=codec_type,codec_name,width,height,r_frame_rate,pix_fmt,channels -of default=noprint_wrappers=1 \\\"$OUT\\\" 2\\u003e/dev/null\",\"description\":\"Assemble full primary opener and probe output\"}"
+      },
+      {
+        "turn_index": 44,
+        "name": "Bash",
+        "text": "{\"command\":\"SRC=\\\"/[REDACTED:secret.entropy]/[REDACTED:pii.name] Ministry of [REDACTED:pii.name] Division .mp4\\\"\\nPROJ=\\\"$HOME/Downloads/ai_india_opening\\\"; SEG=\\\"$[REDACTED:secret.entropy]\\\"; TX=\\\"$PROJ/work/text\\\"\\nOUT=\\\"$PROJ/ai_india_opening_0_5s.mp4\\\"\\nSTART=288.7\\n\\nffmpeg -hide_banner -y \\\\\\n -ss $START -t 3.2 -i \\\"$SRC\\\" \\\\\\n -framerate 30 -loop 1 -t 1.2 -i \\\"$TX/title.png\\\" \\\\\\n -framerate 30 -loop 1 -t 3.2 -i \\\"$TX/caption.png\\\" \\\\\\n -framerate 30 -loop 1 -t 0.6 -i \\\"$TX/final.png\\\" \\\\\\n -f lavfi -i \\\"color=c=black:s=1080x1920:r=30:d=1.2\\\" \\\\\\n -f lavfi -i \\\"color=c=black:s=1080x1920:r=30:d=0.6\\\" \\\\\\n -i \\\"$SEG/radio_bed.wav\\\" \\\\\\n -filter_complex \\\"\\\\\\n   [4]format=yuv420p,setsar=1[bg1]; \\\\\\n   [1]format=rgba,fade=t=in:st=0:d=0.4:alpha=1[t1]; \\\\\\n   [bg1][t1]overlay=0:0,format=yuv420p,setsar=1[s1]; \\\\\\n   [0]fps=30,crop=1280:580:0:0,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,\\\\\\n      scale=w='round(iw*(1+0.10*min(t/3.2\\\\,1))/2)*2':h='round(ih*(1+0.10*min(t/3.2\\\\,1))/2)*2':eval=frame,crop=1080:1920,\\\\\\n      eq=contrast=1.09:brightness=-0.02:gamma=0.98,\\\\\\n      colorbalance=rs=-0.05:gs=-0.01:bs=0.09:rm=-0.04:bm=0.07:rh=-0.03:bh=0.05,\\\\\\n      noise=alls=10:allf=t,vignette=angle=PI/4.4,fade=t=out:st=2.9:d=0.3,format=yuv420p,setsar=1[v2b]; \\\\\\n   [2]format=rgba,fade=t=in:st=0.35:d=0.5:alpha=1,fade=t=out:st=3.0:d=0.2:alpha=1[t2]; \\\\\\n   [v2b][t2]overlay=0:0,format=yuv420p,setsar=1[s2]; \\\\\\n   [5]format=yuv420p,setsar=1[bg3]; \\\\\\n   [3]format=rgba,fade=t=in:st=0.06:d=0.3:alpha=1[t3]; \\\\\\n   [bg3][t3]overlay=0:0,format=yuv420p,setsar=1[s3]; \\\\\\n   [s1][s2][s3]concat=n=3:v=1:a=0[v]\\\" \\\\\\n -map \\\"[v]\\\" -map 6:a -t 5 \\\\\\n -c:v libx264 -preset slow -crf 20 -pix_fmt yuv420p -r 30 \\\\\\n -c:a aac -b:a 192k -movflags +faststart \\\"$OUT\\\" 2\\u003e\\\"$[REDACTED:secret.entropy].log\\\" \\\\\\n \\u0026\\u0026 echo \\\"ASSEMBLED OK\\\" || { echo \\\"ASSEMBLE FAILED\\\"; tail -20 \\\"$[REDACTED:secret.entropy].log\\\"; }\\n\\necho \\\"=== probe ===\\\"\\nffprobe -v error -show_entries format=duration,size,bit_rate -show_entries stream=codec_type,codec_name,width,height,r_frame_rate,pix_fmt,channels,sample_rate -of default=noprint_wrappers=1 \\\"$OUT\\\" 2\\u003e/dev/null\",\"description\":\"Re-assemble primary opener with setsar=1 fix\"}"
+      },
+      {
+        "turn_index": 45,
+        "name": "Bash",
+        "text": "{\"command\":\"PROJ=\\\"$HOME/Downloads/ai_india_opening\\\"; OUT=\\\"$PROJ/ai_india_opening_0_5s.mp4\\\"; V=\\\"$[REDACTED:secret.entropy]\\\"; mkdir -p \\\"$V\\\"\\nfor t in 0.6 1.8 2.6 3.6 4.2 4.7; do\\n  ffmpeg -hide_banner -y -ss $t -i \\\"$OUT\\\" -frames:v 1 -q:v 2 \\\"$V/f_${t}.jpg\\\" 2\\u003e/dev/null\\ndone\\necho \\\"frames:\\\"; ls \\\"$V\\\"\\necho \\\"=== audio level of final ===\\\"\\nffmpeg -hide_banner -i \\\"$OUT\\\" -af volumedetect -f null - 2\\u003e\\u00261 | grep -E 'mean_volume|max_volume'\",\"description\":\"Extract verification frames across all beats and check final audio level\"}"
+      },
+      {
+        "turn_index": 46,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/verify/f_0.6.jpg\"}"
+      },
+      {
+        "turn_index": 47,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/verify/f_2.6.jpg\"}"
+      },
+      {
+        "turn_index": 48,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/verify/f_3.6.jpg\"}"
+      },
+      {
+        "turn_index": 49,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/verify/f_4.7.jpg\"}"
+      },
+      {
+        "turn_index": 50,
+        "name": "Write",
+        "text": "{\"content\":\"#!/usr/bin/env bash\\n# =============================================================================\\n# make_opening.sh  —  cinematic 0–5s opener \\\"ai_india_opening_0_5s.mp4\\\"\\n#\\n#   black + radio static  -\\u003e  archival struggle footage (slow zoom, grade)\\n#   -\\u003e  fade to black + final line.   9:16 / 1080x1920 / 30fps / H.264+AAC.\\n#\\n# Usage:\\n#   ./make_opening.sh                 # end-to-end: scan (first run) + build final\\n#   ./make_opening.sh candidates      # build final + 8 candidate openers + README\\n#   ./make_opening.sh scan            # only scene-detect + contact sheets\\n#   SRC=\\\"/path/to/video.mp4\\\" ./make_opening.sh\\n#   ARCH_START=186.0 ./make_opening.sh        # override the archival in-point\\n#   RESCAN=1 ./make_opening.sh                # force re-scan of scene thumbnails\\n#\\n# Notes:\\n#   * Source video is auto-located if SRC is not given (searches Downloads/Movies).\\n#   * The source is NEVER modified or overwritten. No watermark is added.\\n#   * Radio hum/static is synthesised with ffmpeg only (sine + noise).\\n#   * Text is rendered with ffmpeg drawtext when available, otherwise with\\n#     Pillow (Python) into transparent PNGs that are composited via overlay.\\n# =============================================================================\\nset -euo pipefail\\n\\n# ----------------------------------------------------------------------------- config\\nPROJ_DIR=\\\"$(cd \\\"$(dirname \\\"${BASH_SOURCE[0]}\\\")\\\" \\u0026\\u0026 pwd)\\\"\\nWORK=\\\"$PROJ_DIR/work\\\"\\nTHUMBS=\\\"$WORK/scene_thumbs\\\"\\nSHEETS=\\\"$WORK/contact_sheets\\\"\\nTXT=\\\"$WORK/text\\\"\\nSEG=\\\"$WORK/segments\\\"\\nCAND=\\\"$PROJ_DIR/candidates\\\"\\nOUT=\\\"$PROJ_DIR/ai_india_opening_0_5s.mp4\\\"\\n\\nW=1080; H=1920; FPS=30; CRF=\\\"${CRF:-20}\\\"\\nDUR_BLACK1=1.2          # 0.0 .. 1.2  black + title\\nDUR_ARCH=3.2            # 1.2 .. 4.4  archival\\nDUR_BLACK2=0.6          # 4.4 .. 5.0  dark + final line\\nSCENE_THRESH=\\\"${SCENE_THRESH:-0.25}\\\"\\nARCH_START=\\\"${ARCH_START:-288.7}\\\"   # 00:04:48.7 — chosen by inspecting contact sheets\\n\\nTXT_TITLE=\\\"India was not born powerful.\\\"\\nTXT_CAPTION=\\\"It inherited dependence.\\\"\\nTXT_FINAL=\\\"Then it chose to build.\\\"\\n\\n# candidate openers:  \\\"start_seconds|label|what it likely contains\\\"\\nCANDIDATES=(\\n  \\\"288.7|01_procession|A white-clad figure descends steps through a dense crowd; long continuous take (CHOSEN primary).\\\"\\n  \\\"186.0|02_chains_darkyears|Rows of men in chains, heads bowed — 'the dark years' of bondage. The literal image of inherited dependence.\\\"\\n  \\\"180.0|03_enchained|Huddled, bowed figures in chains — 'though her body was enchained'.\\\"\\n  \\\"203.8|04_gandhi_close|Gandhi in close shot, head bowed, spectacles — iconic and immediately readable.\\\"\\n  \\\"205.2|05_gandhi_crowd|Gandhi walking among followers in white caps; movement and depth.\\\"\\n  \\\"870.9|06_vast_crowd|An immense sea of people before temple gopurams — epic scale of a gathered nation.\\\"\\n  \\\"468.0|07_leader_mic|A leader addressing a microphone (Nehru-era address); the moment of speaking up.\\\"\\n  \\\"1175.5|08_army_march|Soldiers marching in formation — the new nation choosing to build/defend itself.\\\"\\n)\\n\\n# ----------------------------------------------------------------------------- helpers: errors / deps\\ndie()  { printf '\\\\033[31mERROR:\\\\033[0m %s\\\\n' \\\"$*\\\" \\u003e\\u00262; exit 1; }\\ninfo() { printf '\\\\033[36m==\\u003e\\\\033[0m %s\\\\n' \\\"$*\\\"; }\\nhave() { command -v \\\"$1\\\" \\u003e/dev/null 2\\u003e\\u00261; }\\n\\ncheck_deps() {\\n  have ffmpeg  || die \\\"ffmpeg not found on PATH. Install it (macOS: 'brew install ffmpeg', Debian/Ubuntu: 'sudo apt install ffmpeg').\\\"\\n  have ffprobe || die \\\"ffprobe not found on PATH. It ships with ffmpeg — reinstall ffmpeg.\\\"\\n  info \\\"ffmpeg:  $(ffmpeg  -version | head -1)\\\"\\n  info \\\"ffprobe: $(ffprobe -version | head -1)\\\"\\n}\\n\\n# ----------------------------------------------------------------------------- locate source video\\nlocate_source() {\\n  if [ -n \\\"${SRC:-}\\\" ]; then\\n    [ -f \\\"$SRC\\\" ] || die \\\"SRC is set but not a file: $SRC\\\"\\n    return\\n  fi\\n  info \\\"SRC not provided — auto-locating an India/archival video…\\\"\\n  local dirs=(\\\"$HOME/Downloads\\\" \\\"$HOME/Movies\\\" \\\"$HOME/Desktop\\\" \\\"$PROJ_DIR\\\" \\\"$PWD\\\")\\n  local exts='mp4 mov mkv avi webm m4v flv wmv mpg mpeg ts'\\n  local found=\\\"\\\"\\n  # 1) prefer a file whose name hints india/independ/archival, largest first\\n  found=$(\\n    for d in \\\"${dirs[@]}\\\"; do [ -d \\\"$d\\\" ] || continue\\n      for e in $exts; do find \\\"$d\\\" -maxdepth 2 -type f -iname \\\"*.$e\\\" 2\\u003e/dev/null; done\\n    done | grep -iE 'india|independ|archiv' | while read -r f; do printf '%s\\\\t%s\\\\n' \\\"$(stat -f%z \\\"$f\\\" 2\\u003e/dev/null || stat -c%s \\\"$f\\\")\\\" \\\"$f\\\"; done | sort -rn | head -1 | cut -f2-\\n  )\\n  # 2) otherwise the single largest video in those dirs (a 20-min film is large)\\n  if [ -z \\\"$found\\\" ]; then\\n    found=$(\\n      for d in \\\"${dirs[@]}\\\"; do [ -d \\\"$d\\\" ] || continue\\n        for e in $exts; do find \\\"$d\\\" -maxdepth 2 -type f -iname \\\"*.$e\\\" 2\\u003e/dev/null; done\\n      done | while read -r f; do printf '%s\\\\t%s\\\\n' \\\"$(stat -f%z \\\"$f\\\" 2\\u003e/dev/null || stat -c%s \\\"$f\\\")\\\" \\\"$f\\\"; done | sort -rn | head -1 | cut -f2-\\n    )\\n  fi\\n  [ -n \\\"$found\\\" ] || die \\\"Could not auto-locate a video. Pass one with: SRC=/path/to/video.mp4 $0\\\"\\n  SRC=\\\"$found\\\"\\n}\\n\\nprobe_source() {\\n  DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 \\\"$SRC\\\")\\n  read -r SW SH SFPS SPIX \\u003c \\u003c(ffprobe -v error -select_streams v:0 \\\\\\n      -show_entries stream=width,height,r_frame_rate,pix_fmt -of csv=p=0 \\\"$SRC\\\" | tr ',' ' ')\\n  info \\\"Source: $SRC\\\"\\n  info \\\"  duration=${DUR}s  video=${SW}x${SH}  fps=${SFPS}  pix=${SPIX}\\\"\\n}\\n\\n# ----------------------------------------------------------------------------- font detection\\ndetect_font() {\\n  local cands=(\\n    \\\"/[REDACTED:secret.entropy].ttf\\\"\\n    \\\"/[REDACTED:secret.entropy]/[REDACTED:pii.name] Roman.ttf\\\"\\n    \\\"/[REDACTED:secret.entropy].ttc\\\"\\n    \\\"/[REDACTED:secret.entropy].ttf\\\"\\n    \\\"/[REDACTED:secret.entropy].ttc\\\"\\n    \\\"/[REDACTED:secret.entropy].ttf\\\"\\n    \\\"/[REDACTED:secret.entropy].ttf\\\"\\n    \\\"/[REDACTED:secret.entropy]-Regular.ttf\\\"\\n    \\\"/[REDACTED:secret.entropy].ttf\\\"\\n  )\\n  for f in \\\"${cands[@]}\\\"; do [ -f \\\"$f\\\" ] \\u0026\\u0026 { FONT=\\\"$f\\\"; return; }; done\\n  FONT=\\\"\\\"   # drawtext will fall back to its built-in default if empty\\n}\\n\\n# ----------------------------------------------------------------------------- pick text engine\\npick_text_engine() {\\n  HAVE_DRAWTEXT=0; HAVE_PILLOW=0\\n  ffmpeg -hide_banner -filters 2\\u003e/dev/null | grep -qw drawtext \\u0026\\u0026 HAVE_DRAWTEXT=1\\n  if have python3 \\u0026\\u0026 python3 -c \\\"import PIL.ImageFont\\\" \\u003e/dev/null 2\\u003e\\u00261; then HAVE_PILLOW=1; fi\\n  if   [ \\\"$HAVE_PILLOW\\\"   = 1 ]; then TEXT_ENGINE=pillow\\n  elif [ \\\"$HAVE_DRAWTEXT\\\" = 1 ]; then TEXT_ENGINE=drawtext\\n  else die \\\"No text renderer available: this ffmpeg lacks the 'drawtext' filter (no libfreetype) and Python+Pillow is not installed. [REDACTED:pii.name] ('python3 -m pip install pillow') or an ffmpeg built with libfreetype.\\\"\\n  fi\\n  info \\\"Text engine: $TEXT_ENGINE  (drawtext=$HAVE_DRAWTEXT pillow=$HAVE_PILLOW)  font=${FONT:-\\u003cffmpeg default\\u003e}\\\"\\n}\\n\\n# write the Pillow text-card helper (self-contained, only used when TEXT_ENGINE=pillow)\\nwrite_mktext_py() {\\n  cat \\u003e \\\"$WORK/mktext.py\\\" \\u003c\\u003c'PYEOF'\\nimport argparse, sys\\nfrom PIL import Image, ImageDraw, ImageFont, ImageFilter\\nW, H = 1080, 1920\\nFALLBACK = [\\\"/[REDACTED:secret.entropy].ttf\\\",\\n            \\\"/[REDACTED:secret.entropy].ttf\\\",\\n            \\\"/[REDACTED:secret.entropy].ttc\\\",\\n            \\\"/[REDACTED:secret.entropy].ttf\\\",\\n            \\\"/[REDACTED:secret.entropy].ttf\\\"]\\ndef load_font(size, explicit):\\n    for p in ([explicit] if explicit else []) + FALLBACK:\\n        try: return ImageFont.truetype(p, size)\\n        except Exception: pass\\n    return ImageFont.load_default()\\ndef tw(font, s, tr): return (sum(font.getbbox(c)[2] for c in s) + tr*(len(s)-1)) if tr else font.getbbox(s)[2]\\ndef wrap(font, s, tr, mx):\\n    out, cur = [], \\\"\\\"\\n    for w in s.split(\\\" \\\"):\\n        t = (cur+\\\" \\\"+w).strip()\\n        if tw(font,t,tr) \\u003c= mx or not cur: cur = t\\n        else: out.append(cur); cur = w\\n    if cur: out.append(cur)\\n    return out\\ndef draw_line(d, x, y, s, font, fill, tr):\\n    if not tr: d.text((x,y), s, font=font, fill=fill); return\\n    for c in s: d.text((x,y), c, font=font, fill=fill); x += font.getbbox(c)[2] + tr\\ndef main():\\n    ap = argparse.ArgumentParser()\\n    ap.add_argument(\\\"--text\\\", required=True); ap.add_argument(\\\"--out\\\", required=True)\\n    ap.add_argument(\\\"--size\\\", type=int, default=60); ap.add_argument(\\\"--font\\\", default=None)\\n    ap.add_argument(\\\"--pos\\\", default=\\\"center\\\"); ap.add_argument(\\\"--color\\\", default=\\\"234,234,234\\\")\\n    ap.add_argument(\\\"--alpha\\\", type=float, default=0.92); ap.add_argument(\\\"--tracking\\\", type=int, default=2)\\n    ap.add_argument(\\\"--shadow\\\", type=int, default=18); ap.add_argument(\\\"--maxw\\\", type=int, default=960)\\n    ap.add_argument(\\\"--leading\\\", type=float, default=1.28)\\n    a = ap.parse_args()\\n    font = load_font(a.size, a.font)\\n    r,g,b = (int(v) for v in a.color.split(\\\",\\\")); al = int(max(0,min(1,a.alpha))*255)\\n    while tw(font,a.text,a.tracking) \\u003e a.maxw and a.size \\u003e 24 and \\\" \\\" not in a.text:\\n        a.size -= 2; font = load_font(a.size, a.font)\\n    lines = wrap(font, a.text, a.tracking, a.maxw)\\n    asc,desc = font.getmetrics(); lh = int((asc+desc)*a.leading); bh = lh*len(lines)\\n    y0 = (H-bh)//2 if a.pos==\\\"center\\\" else (int(H*0.80)-bh//2 if a.pos==\\\"lower\\\" else int(a.pos))\\n    img = Image.new(\\\"RGBA\\\",(W,H),(0,0,0,0)); d = ImageDraw.Draw(img)\\n    if a.shadow \\u003e 0:\\n        sh = Image.new(\\\"RGBA\\\",(W,H),(0,0,0,0)); sd = ImageDraw.Draw(sh)\\n        for i,ln in enumerate(lines):\\n            draw_line(sd,(W-tw(font,ln,a.tracking))//2+2, y0+i*lh+3, ln, font,(0,0,0,200), a.tracking)\\n        img = Image.alpha_composite(img, sh.filter(ImageFilter.GaussianBlur(a.shadow))); d = ImageDraw.Draw(img)\\n    for i,ln in enumerate(lines):\\n        draw_line(d,(W-tw(font,ln,a.tracking))//2, y0+i*lh, ln, font,(r,g,b,al), a.tracking)\\n    img.save(a.out); print(\\\"wrote\\\", a.out)\\nmain()\\nPYEOF\\n}\\n\\n# render one text card to a transparent 1080x1920 PNG\\n# args: TEXT OUT SIZE POS(center|lower|\\u003cy\\u003e) COLOR(r,g,b) ALPHA TRACKING SHADOW\\nrender_text() {\\n  local text=\\\"$1\\\" out=\\\"$2\\\" size=\\\"$3\\\" pos=\\\"$4\\\" color=\\\"$5\\\" alpha=\\\"$6\\\" tracking=\\\"$7\\\" shadow=\\\"$8\\\"\\n  if [ \\\"$TEXT_ENGINE\\\" = pillow ]; then\\n    python3 \\\"$WORK/mktext.py\\\" --text \\\"$text\\\" --out \\\"$out\\\" --size \\\"$size\\\" --pos \\\"$pos\\\" \\\\\\n      --color \\\"$color\\\" --alpha \\\"$alpha\\\" --tracking \\\"$tracking\\\" --shadow \\\"$shadow\\\" ${FONT:+--font \\\"$FONT\\\"} \\u003e/dev/null\\n  else\\n    # ffmpeg drawtext fallback -\\u003e transparent PNG (portable path for full ffmpeg builds)\\n    local y; case \\\"$pos\\\" in center) y='(h-text_h)/2';; lower) y='h*0.80-text_h/2';; *) y=\\\"$pos\\\";; esac\\n    local R G B; IFS=, read -r R G B \\u003c\\u003c\\u003c\\\"$color\\\"\\n    local hex; hex=$(printf '0x%02X%02X%02X' \\\"$R\\\" \\\"$G\\\" \\\"$B\\\")\\n    ffmpeg -hide_banner -y -f lavfi -i \\\"color=c=black@0.0:s=${W}x${H},format=rgba\\\" -frames:v 1 \\\\\\n      -vf \\\"drawtext=${FONT:+fontfile=$FONT:}text='${text//\\\\'/\\\\\\\\\\\\'}':fontcolor=${hex}@${alpha}:fontsize=${size}:x=(w-text_w)/2:y=${y}:shadowcolor=black@0.5:shadowx=2:shadowy=2\\\" \\\\\\n      \\\"$out\\\" \\u003e/dev/null 2\\u003e\\u00261\\n  fi\\n}\\n\\nbuild_text_cards() {\\n  mkdir -p \\\"$TXT\\\"\\n  [ \\\"$TEXT_ENGINE\\\" = pillow ] \\u0026\\u0026 write_mktext_py\\n  render_text \\\"$TXT_TITLE\\\"   \\\"$TXT/title.png\\\"   62 center 234,234,234 0.92 3 20\\n  render_text \\\"$TXT_CAPTION\\\" \\\"$TXT/caption.png\\\" 46 lower  220,224,232 0.96 2 26\\n  render_text \\\"$TXT_FINAL\\\"   \\\"$TXT/final.png\\\"   60 center 245,245,245 0.97 3 20\\n  info \\\"Text cards rendered -\\u003e $TXT\\\"\\n}\\n\\n# ----------------------------------------------------------------------------- radio hum + static bed (ffmpeg only)\\nmake_radio_bed() {\\n  mkdir -p \\\"$SEG\\\"\\n  ffmpeg -hide_banner -y \\\\\\n    -f lavfi -i \\\"sine=frequency=50:sample_rate=44100:duration=5\\\" \\\\\\n    -f lavfi -i \\\"sine=frequency=100:sample_rate=44100:duration=5\\\" \\\\\\n    -f lavfi -i \\\"anoisesrc=color=pink:sample_rate=44100:duration=5:amplitude=0.6\\\" \\\\\\n    -filter_complex \\\"\\\\\\n      [0:a]volume=0.22[h1];\\\\\\n      [1:a]volume=0.07[h2];\\\\\\n      [2:a]highpass=f=180,lowpass=f=3200,volume=0.12,tremolo=f=0.4:d=0.4[ns];\\\\\\n      [h1][h2]amix=inputs=2:normalize=0[hum];\\\\\\n      [hum]vibrato=f=0.25:d=0.18[humv];\\\\\\n      [humv][ns]amix=inputs=2:normalize=0,afade=t=in:st=0:d=0.5,afade=t=out:st=4.5:d=0.5,alimiter=limit=0.35[a]\\\" \\\\\\n    -map \\\"[a]\\\" -t 5 -c:a pcm_s16le \\\"$SEG/radio_bed.wav\\\" \\u003e/dev/null 2\\u003e\\u00261\\n  info \\\"Radio bed: $(ffmpeg -hide_banner -i \\\"$SEG/radio_bed.wav\\\" -af volumedetect -f null - 2\\u003e\\u00261 | grep mean_volume | sed 's/.*] //')\\\"\\n}\\n\\n# ----------------------------------------------------------------------------- scene detection + contact sheets\\nscan_scenes() {\\n  mkdir -p \\\"$THUMBS\\\" \\\"$SHEETS\\\"\\n  if [ \\\"${RESCAN:-0}\\\" != 1 ] \\u0026\\u0026 ls \\\"$THUMBS\\\"/scene_*.jpg \\u003e/dev/null 2\\u003e\\u00261; then\\n    info \\\"scene thumbnails already present (RESCAN=1 to redo) — skipping scan\\\"; return\\n  fi\\n  rm -f \\\"$THUMBS\\\"/*.jpg \\\"$SHEETS\\\"/*.jpg 2\\u003e/dev/null || true\\n  info \\\"Scene detection (scene\\u003e$SCENE_THRESH) — decoding the full film, please wait…\\\"\\n  ffmpeg -hide_banner -y -an -i \\\"$SRC\\\" \\\\\\n    -vf \\\"select='gt(scene,$SCENE_THRESH)',showinfo,scale=360:-1\\\" -fps_mode vfr -q:v 3 \\\\\\n    \\\"$THUMBS/scene_%04d.jpg\\\" 2\\u003e \\\"$WORK/scene_detect.log\\\"\\n  info \\\"  scene thumbs: $(ls \\\"$THUMBS\\\"/scene_*.jpg 2\\u003e/dev/null | wc -l | tr -d ' ')\\\"\\n  info \\\"Fallback grid thumbnails (every 10s)…\\\"\\n  ffmpeg -hide_banner -y -an -i \\\"$SRC\\\" -vf \\\"fps=1/10,scale=360:-1\\\" -fps_mode vfr -q:v 3 \\\\\\n    \\\"$THUMBS/grid_%04d.jpg\\\" 2\\u003e \\\"$WORK/grid.log\\\"\\n  info \\\"  grid thumbs:  $(ls \\\"$THUMBS\\\"/grid_*.jpg 2\\u003e/dev/null | wc -l | tr -d ' ')\\\"\\n  build_contact_sheets\\n}\\n\\nwrite_contact_py() {\\n  cat \\u003e \\\"$WORK/contact.py\\\" \\u003c\\u003c'PYEOF'\\nimport argparse, glob, os, re, sys\\nfrom PIL import Image, ImageDraw, ImageFont\\nFONTS = [\\\"/[REDACTED:secret.entropy].ttf\\\",\\\"/[REDACTED:secret.entropy].ttc\\\",\\n         \\\"/[REDACTED:secret.entropy].ttf\\\"]\\ndef font(sz):\\n    for p in FONTS:\\n        try: return ImageFont.truetype(p,sz)\\n        except Exception: pass\\n    return ImageFont.load_default()\\ndef hms(t): t=float(t); return f\\\"{int(t//3600):02d}:{int(t%3600//60):02d}:{t%60:06.3f}\\\"\\ndef stimes(lp):\\n    o=[]\\n    for ln in open(lp,errors=\\\"ignore\\\"):\\n        m=re.search(r\\\"pts_time:([0-9.]+)\\\",ln)\\n        if m: o.append(float(m.group(1)))\\n    return o\\nap=argparse.ArgumentParser()\\nap.add_argument(\\\"--dir\\\",required=True); ap.add_argument(\\\"--pattern\\\",required=True)\\nap.add_argument(\\\"--mode\\\",choices=[\\\"scene\\\",\\\"grid\\\"],required=True); ap.add_argument(\\\"--log\\\")\\nap.add_argument(\\\"--interval\\\",type=float,default=10.0); ap.add_argument(\\\"--out\\\",required=True)\\nap.add_argument(\\\"--cols\\\",type=int,default=5); ap.add_argument(\\\"--rows\\\",type=int,default=6)\\na=ap.parse_args()\\nth=sorted(glob.glob(os.path.join(a.dir,a.pattern)))\\nif not th: print(\\\"no thumbs\\\",file=sys.stderr); sys.exit(1)\\ntimes=stimes(a.log) if (a.mode==\\\"scene\\\" and a.log and os.path.exists(a.log)) else [i*a.interval for i in range(len(th))]\\ncw,ch=Image.open(th[0]).size; pad,lab=8,24; cell_w,cell_h=cw+pad*2,ch+pad*2+lab\\nper=a.cols*a.rows; f=font(20); n=(len(th)+per-1)//per\\nfor s in range(n):\\n    sh=Image.new(\\\"RGB\\\",(cell_w*a.cols,cell_h*a.rows),(16,16,20)); d=ImageDraw.Draw(sh)\\n    for k in range(per):\\n        i=s*per+k\\n        if i\\u003e=len(th): break\\n        im=Image.open(th[i]).convert(\\\"RGB\\\"); cx=(k%a.cols)*cell_w+pad; cy=(k//a.cols)*cell_h+pad\\n        sh.paste(im,(cx,cy)); t=times[i] if i\\u003clen(times) else None\\n        tag=f\\\"#{i+1}  {hms(t)}\\\" if t is not None else f\\\"#{i+1}\\\"\\n        d.rectangle([cx,cy+ch,cx+cw,cy+ch+lab],fill=(0,0,0)); d.text((cx+4,cy+ch+2),tag,fill=(255,220,70),font=f)\\n    sh.save(f\\\"{a.out}_{s+1:03d}.jpg\\\",quality=88)\\nprint(f\\\"{len(th)} thumbs -\\u003e {n} sheet(s)\\\")\\nPYEOF\\n}\\n\\nbuild_contact_sheets() {\\n  if [ \\\"$HAVE_PILLOW\\\" = 1 ]; then\\n    write_contact_py\\n    python3 \\\"$WORK/contact.py\\\" --dir \\\"$THUMBS\\\" --pattern 'scene_*.jpg' --mode scene \\\\\\n      --log \\\"$WORK/scene_detect.log\\\" --out \\\"$SHEETS/scene_contact\\\" \\u003e/dev/null || true\\n    python3 \\\"$WORK/contact.py\\\" --dir \\\"$THUMBS\\\" --pattern 'grid_*.jpg' --mode grid \\\\\\n      --interval 10 --out \\\"$SHEETS/grid_contact\\\" \\u003e/dev/null || true\\n  else\\n    ffmpeg -hide_banner -y -framerate 1 -i \\\"$THUMBS/scene_%04d.jpg\\\" \\\\\\n      -vf \\\"tile=5x6:margin=10:padding=8:color=0x101014\\\" -q:v 3 \\\"$SHEETS/scene_contact_%03d.jpg\\\" \\u003e/dev/null 2\\u003e\\u00261 || true\\n    ffmpeg -hide_banner -y -framerate 1 -i \\\"$THUMBS/grid_%04d.jpg\\\" \\\\\\n      -vf \\\"tile=5x6:margin=10:padding=8:color=0x101014\\\" -q:v 3 \\\"$SHEETS/grid_contact_%03d.jpg\\\" \\u003e/dev/null 2\\u003e\\u00261 || true\\n  fi\\n  info \\\"Contact sheets -\\u003e $SHEETS\\\"\\n}\\n\\n# ----------------------------------------------------------------------------- assemble one 5s opener\\n# args: ARCH_START_SECONDS  OUTPUT_PATH\\nbuild_opener() {\\n  local start=\\\"$1\\\" out=\\\"$2\\\"\\n  ffmpeg -hide_banner -y \\\\\\n    -ss \\\"$start\\\" -t \\\"$DUR_ARCH\\\" -i \\\"$SRC\\\" \\\\\\n    -framerate \\\"$FPS\\\" -loop 1 -t \\\"$DUR_BLACK1\\\" -i \\\"$TXT/title.png\\\" \\\\\\n    -framerate \\\"$FPS\\\" -loop 1 -t \\\"$DUR_ARCH\\\"   -i \\\"$TXT/caption.png\\\" \\\\\\n    -framerate \\\"$FPS\\\" -loop 1 -t \\\"$DUR_BLACK2\\\" -i \\\"$TXT/final.png\\\" \\\\\\n    -f lavfi -i \\\"color=c=black:s=${W}x${H}:r=${FPS}:d=${DUR_BLACK1}\\\" \\\\\\n    -f lavfi -i \\\"color=c=black:s=${W}x${H}:r=${FPS}:d=${DUR_BLACK2}\\\" \\\\\\n    -i \\\"$SEG/radio_bed.wav\\\" \\\\\\n    -filter_complex \\\"\\\\\\n      [4]format=yuv420p,setsar=1[bg1]; \\\\\\n      [1]format=rgba,fade=t=in:st=0:d=0.4:alpha=1[t1]; \\\\\\n      [bg1][t1]overlay=0:0,format=yuv420p,setsar=1[s1]; \\\\\\n      [0]fps=${FPS},crop=1280:580:0:0,scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},\\\\\\n         scale=w='round(iw*(1+0.10*min(t/${DUR_ARCH}\\\\,1))/2)*2':h='round(ih*(1+0.10*min(t/${DUR_ARCH}\\\\,1))/2)*2':eval=frame,crop=${W}:${H},\\\\\\n         eq=contrast=1.09:brightness=-0.02:gamma=0.98,\\\\\\n         colorbalance=rs=-0.05:gs=-0.01:bs=0.09:rm=-0.04:bm=0.07:rh=-0.03:bh=0.05,\\\\\\n         noise=alls=10:allf=t,vignette=angle=PI/4.4,fade=t=out:st=2.9:d=0.3,format=yuv420p,setsar=1[v2b]; \\\\\\n      [2]format=rgba,fade=t=in:st=0.35:d=0.5:alpha=1,fade=t=out:st=3.0:d=0.2:alpha=1[t2]; \\\\\\n      [v2b][t2]overlay=0:0,format=yuv420p,setsar=1[s2]; \\\\\\n      [5]format=yuv420p,setsar=1[bg3]; \\\\\\n      [3]format=rgba,fade=t=in:st=0.06:d=0.3:alpha=1[t3]; \\\\\\n      [bg3][t3]overlay=0:0,format=yuv420p,setsar=1[s3]; \\\\\\n      [s1][s2][s3]concat=n=3:v=1:a=0[v]\\\" \\\\\\n    -map \\\"[v]\\\" -map 6:a -t 5 \\\\\\n    -c:v libx264 -preset slow -crf \\\"$CRF\\\" -pix_fmt yuv420p -r \\\"$FPS\\\" \\\\\\n    -c:a aac -b:a 192k -movflags +faststart \\\"$out\\\" 2\\u003e \\\"$WORK/assemble.log\\\" \\\\\\n    || { tail -20 \\\"$WORK/assemble.log\\\" \\u003e\\u00262; die \\\"ffmpeg assembly failed for start=$start\\\"; }\\n}\\n\\nbuild_candidates() {\\n  mkdir -p \\\"$CAND\\\"\\n  local readme=\\\"$CAND/README.md\\\"\\n  {\\n    echo \\\"# Candidate openers\\\"\\n    echo\\n    echo \\\"Each file is a complete 5-second opener (same black-title and final-line beats,\\\"\\n    echo \\\"same synthesised radio bed) differing only in the **archival in-point** used for\\\"\\n    echo \\\"the 1.2s–4.4s segment. Source: \\\\`$(basename \\\"$SRC\\\")\\\\`. Pick one and copy it over\\\"\\n    echo \\\"\\\\`ai_india_opening_0_5s.mp4\\\\`, or re-run: \\\\`ARCH_START=\\u003cseconds\\u003e ./make_opening.sh\\\\`.\\\"\\n    echo\\n    echo \\\"| File | In-point | Likely contents |\\\"\\n    echo \\\"|------|----------|-----------------|\\\"\\n  } \\u003e \\\"$readme\\\"\\n  for entry in \\\"${CANDIDATES[@]}\\\"; do\\n    IFS='|' read -r st label desc \\u003c\\u003c\\u003c\\\"$entry\\\"\\n    local f=\\\"opening_candidate_${label}.mp4\\\"\\n    local hh; hh=$(printf '%02d:%02d:%06.3f' \\\"$(echo \\\"$st/3600\\\"|bc)\\\" \\\"$(echo \\\"$st%3600/60\\\"|bc)\\\" \\\"$(echo \\\"$st%60\\\"|bc -l)\\\")\\n    info \\\"candidate $label  @ ${st}s ($hh)\\\"\\n    build_opener \\\"$st\\\" \\\"$CAND/$f\\\"\\n    echo \\\"| \\\\`$f\\\\` | ${hh} (${st}s) | $desc |\\\" \\u003e\\u003e \\\"$readme\\\"\\n  done\\n  info \\\"Candidates + README -\\u003e $CAND\\\"\\n}\\n\\nprint_summary() {\\n  echo\\n  printf '\\\\033[32m================ DONE ================\\\\033[0m\\\\n'\\n  echo \\\"Final opener : $OUT\\\"\\n  ffprobe -v error -show_entries format=duration -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt,codec_type \\\\\\n    -of default=noprint_wrappers=1 \\\"$OUT\\\" 2\\u003e/dev/null | sed 's/^/    /'\\n  echo\\n  echo \\\"Structure / timestamps used:\\\"\\n  echo \\\"    0.0s–1.2s  black + radio static   \\\\\\\"$TXT_TITLE\\\\\\\"\\\"\\n  echo \\\"    1.2s–4.4s  archival @ ${ARCH_START}s (00:04:48.7), slow zoom + dark-blue grade   \\\\\\\"$TXT_CAPTION\\\\\\\"\\\"\\n  echo \\\"    4.4s–5.0s  fade to black   \\\\\\\"$TXT_FINAL\\\\\\\"\\\"\\n  if [ \\\"${MODE}\\\" = candidates ]; then\\n    echo\\n    echo \\\"Candidate in-points:\\\"\\n    for entry in \\\"${CANDIDATES[@]}\\\"; do IFS='|' read -r st label desc \\u003c\\u003c\\u003c\\\"$entry\\\"; printf '    %-22s %ss\\\\n' \\\"$label\\\" \\\"$st\\\"; done\\n  fi\\n}\\n\\n# ----------------------------------------------------------------------------- main\\nMODE=build\\nfor a in \\\"$@\\\"; do\\n  case \\\"$a\\\" in\\n    build|candidates|scan) MODE=\\\"$a\\\" ;;\\n    *) if [ -f \\\"$a\\\" ]; then SRC=\\\"$a\\\"; else die \\\"Unknown argument: $a\\\"; fi ;;\\n  esac\\ndone\\n\\nmkdir -p \\\"$WORK\\\" \\\"$THUMBS\\\" \\\"$SHEETS\\\" \\\"$TXT\\\" \\\"$SEG\\\" \\\"$CAND\\\"\\ncheck_deps\\nlocate_source\\nprobe_source\\ndetect_font\\npick_text_engine\\n\\ncase \\\"$MODE\\\" in\\n  scan)\\n    scan_scenes\\n    info \\\"Scan complete. Review contact sheets in: $SHEETS\\\"\\n    ;;\\n  build)\\n    scan_scenes              # idempotent: only decodes on first run\\n    build_text_cards\\n    make_radio_bed\\n    info \\\"Assembling final opener (archival in-point ${ARCH_START}s)…\\\"\\n    build_opener \\\"$ARCH_START\\\" \\\"$OUT\\\"\\n    print_summary\\n    ;;\\n  candidates)\\n    scan_scenes\\n    build_text_cards\\n    make_radio_bed\\n    info \\\"Assembling final opener…\\\"\\n    build_opener \\\"$ARCH_START\\\" \\\"$OUT\\\"\\n    build_candidates\\n    print_summary\\n    ;;\\nesac\\n\",\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/make_opening.sh\"}"
+      },
+      {
+        "turn_index": 51,
+        "name": "Edit",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/make_opening.sh\",\"new_string\":\"    local f=\\\"opening_candidate_${label}.mp4\\\"\\n    local hh; hh=$(awk -v t=\\\"$st\\\" 'BEGIN{h=int(t/3600);m=int((t%3600)/60);s=t-h*3600-m*60;printf \\\"%02d:%02d:%06.3f\\\",h,m,s}')\",\"old_string\":\"    local f=\\\"opening_candidate_${label}.mp4\\\"\\n    local hh; hh=$(printf '%02d:%02d:%06.3f' \\\"$(echo \\\"$st/3600\\\"|bc)\\\" \\\"$(echo \\\"$st%3600/60\\\"|bc)\\\" \\\"$(echo \\\"$st%60\\\"|bc -l)\\\")\",\"replace_all\":false}"
+      },
+      {
+        "turn_index": 52,
+        "name": "Bash",
+        "text": "{\"command\":\"cd \\\"$HOME/Downloads/ai_india_opening\\\"\\nchmod +x make_opening.sh\\n# syntax check first\\nbash -n make_opening.sh \\u0026\\u0026 echo \\\"syntax OK\\\"\\necho \\\"--- running: ./make_opening.sh candidates ---\\\"\\n./make_opening.sh candidates 2\\u003e\\u00261 | sed 's/^/  /'\",\"description\":\"Make executable, syntax-check, and run candidates mode\"}"
+      },
+      {
+        "turn_index": 53,
+        "name": "Edit",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/make_opening.sh\",\"new_string\":\"  DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 \\\"$SRC\\\")\\n  SW=$(ffprobe   -v error -select_streams v:0 -show_entries stream=width        -of csv=p=0 \\\"$SRC\\\")\\n  SH=$(ffprobe   -v error -select_streams v:0 -show_entries stream=height       -of csv=p=0 \\\"$SRC\\\")\\n  SFPS=$(ffprobe -v error -select_streams v:0 -show_entries stream=r_frame_rate -of csv=p=0 \\\"$SRC\\\")\\n  SPIX=$(ffprobe -v error -select_streams v:0 -show_entries stream=pix_fmt      -of csv=p=0 \\\"$SRC\\\")\",\"old_string\":\"  DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 \\\"$SRC\\\")\\n  read -r SW SH SFPS SPIX \\u003c \\u003c(ffprobe -v error -select_streams v:0 \\\\\\n      -show_entries stream=width,height,r_frame_rate,pix_fmt -of csv=p=0 \\\"$SRC\\\" | tr ',' ' ')\",\"replace_all\":false}"
+      },
+      {
+        "turn_index": 54,
+        "name": "Bash",
+        "text": "{\"command\":\"PROJ=\\\"$HOME/Downloads/ai_india_opening\\\"; CAND=\\\"$PROJ/candidates\\\"; V=\\\"$[REDACTED:secret.entropy]\\\"\\necho \\\"=== candidate files ===\\\"\\nls -lh \\\"$CAND\\\"/*.mp4 | awk '{print $5\\\"\\\\t\\\"$9}'\\necho\\necho \\\"=== README.md ===\\\"\\ncat \\\"$CAND/README.md\\\"\\necho\\necho \\\"=== extract archival-beat frame (t=2.6s) from a few candidates ===\\\"\\nfor c in 02_chains_darkyears 06_vast_crowd 07_leader_mic 08_army_march; do\\n  ffmpeg -hide_banner -y -ss 2.6 -i \\\"$CAND/opening_candidate_${c}.mp4\\\" -frames:v 1 -q:v 2 \\\"$V/cand_${c}.jpg\\\" 2\\u003e/dev/null \\u0026\\u0026 echo \\\"  cand_${c}.jpg\\\"\\ndone\",\"description\":\"List candidates, show README, extract verify frames\"}"
+      },
+      {
+        "turn_index": 55,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/verify/cand_02_chains_darkyears.jpg\"}"
+      },
+      {
+        "turn_index": 56,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/verify/cand_06_vast_crowd.jpg\"}"
+      },
+      {
+        "turn_index": 57,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/verify/cand_07_leader_mic.jpg\"}"
+      },
+      {
+        "turn_index": 58,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/verify/cand_08_army_march.jpg\"}"
+      },
+      {
+        "turn_index": 59,
+        "name": "Bash",
+        "text": "{\"command\":\"SRC=\\\"/[REDACTED:secret.entropy]/[REDACTED:pii.name] Ministry of [REDACTED:pii.name] Division .mp4\\\"\\nPROJ=\\\"$HOME/Downloads/ai_india_opening\\\"; C=\\\"$PROJ/work/cand\\\"\\nGMD=\\\"crop=1280:580:0:0,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,eq=contrast=1.09:brightness=-0.02:gamma=0.98,colorbalance=rs=-0.05:gs=-0.01:bs=0.09:rm=-0.04:bm=0.07:rh=-0.03:bh=0.05,noise=alls=10:allf=t,vignette=angle=PI/4.4,format=yuv420p\\\"\\nfor ts in 438.0 470.0 474.0 478.0 482.0; do\\n  ffmpeg -hide_banner -y -ss $ts -i \\\"$SRC\\\" -frames:v 1 -vf \\\"$GMD\\\" -q:v 2 \\\"$C/alt_${ts}.jpg\\\" 2\\u003e/dev/null \\u0026\\u0026 echo \\\"alt_${ts}.jpg\\\"\\ndone\",\"description\":\"Render graded previews around flag/Nehru-mic region for candidate 07 replacement\"}"
+      },
+      {
+        "turn_index": 60,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/cand/alt_438.0.jpg\"}"
+      },
+      {
+        "turn_index": 61,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/cand/alt_474.0.jpg\"}"
+      },
+      {
+        "turn_index": 62,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/cand/alt_478.0.jpg\"}"
+      },
+      {
+        "turn_index": 63,
+        "name": "Edit",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/make_opening.sh\",\"new_string\":\"  \\\"474.0|07_nehru_profile|[REDACTED:pii.name] in profile, white cap — the leader who would build the new nation.\\\"\\n  \\\"1175.5|08_crowds_steps|Crowds streaming down great steps in white — a newly free people in motion.\\\"\",\"old_string\":\"  \\\"468.0|07_leader_mic|A leader addressing a microphone (Nehru-era address); the moment of speaking up.\\\"\\n  \\\"1175.5|08_army_march|Soldiers marching in formation — the new nation choosing to build/defend itself.\\\"\",\"replace_all\":false}"
+      },
+      {
+        "turn_index": 64,
+        "name": "Bash",
+        "text": "{\"command\":\"cd \\\"$HOME/Downloads/ai_india_opening\\\"\\nrm -f candidates/*.mp4 [REDACTED:secret.entropy].md\\n./make_opening.sh candidates 2\\u003e\\u00261 | grep -E 'candidate|DONE|Final|ERROR' | sed 's/\\\\x1b\\\\[[0-9;]*m//g'\\necho \\\"--- files now ---\\\"\\nls candidates/*.mp4 | xargs -n1 basename\\n# verify the corrected candidate 07\\nffmpeg -hide_banner -y -ss 2.6 -i \\\"candidates/opening_candidate_07_nehru_profile.mp4\\\" -frames:v 1 -q:v 2 \\\"work/verify/cand_07_nehru.jpg\\\" 2\\u003e/dev/null \\u0026\\u0026 echo \\\"extracted 07 nehru\\\"\",\"description\":\"Rebuild candidates cleanly and extract corrected candidate 07\"}"
+      },
+      {
+        "turn_index": 65,
+        "name": "Read",
+        "text": "{\"file_path\":\"/[REDACTED:secret.entropy]ai_india_opening/work/verify/cand_07_nehru.jpg\"}"
+      },
+      {
+        "turn_index": 66,
+        "name": "Bash",
+        "text": "{\"command\":\"PROJ=\\\"$HOME/Downloads/ai_india_opening\\\"\\nSRC=\\\"/[REDACTED:secret.entropy]/[REDACTED:pii.name] Ministry of [REDACTED:pii.name] Division .mp4\\\"\\necho \\\"=== spec check: final + all candidates (want 1080x1920, 30/1, yuv420p, h264+aac, ~5.0s) ===\\\"\\nfor f in \\\"$PROJ/ai_india_opening_0_5s.mp4\\\" \\\"$PROJ\\\"/candidates/*.mp4; do\\n  spec=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,pix_fmt,codec_name -of csv=p=0 \\\"$f\\\")\\n  acodec=$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of csv=p=0 \\\"$f\\\")\\n  dur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 \\\"$f\\\")\\n  printf '%-46s v=%s a=%s dur=%s\\\\n' \\\"$(basename \\\"$f\\\")\\\" \\\"$spec\\\" \\\"$acodec\\\" \\\"$dur\\\"\\ndone\\necho\\necho \\\"=== source integrity (must be unmodified) ===\\\"\\nls -le --time-style=+%Y-%m-%dT%H:%M:%S \\\"$SRC\\\" 2\\u003e/dev/null || stat -f '%Sm %N' \\\"$SRC\\\"\\necho \\\"source still present \\u0026 readable: $([ -r \\\"$SRC\\\" ] \\u0026\\u0026 echo yes)\\\"\",\"description\":\"Verify uniform specs across all outputs and source integrity\"}"
+      },
+      {
+        "turn_index": 67,
+        "name": "Read",
+        "text": "{\"file_path\":\"/Users/atharva/.claude/projects/-Users-atharva-[REDACTED:secret.entropy].md\"}"
+      },
+      {
+        "turn_index": 68,
+        "name": "Write",
+        "text": "{\"content\":\"---\\nname: ffmpeg-no-drawtext\\ndescription: [REDACTED:pii.name]'s Homebrew ffmpeg lacks libfreetype → no drawtext/subtitles/ass; use Pillow PNG + overlay for video text\\nmetadata:\\n  type: reference\\n---\\n\\nThe Homebrew `ffmpeg` 8.1 on this machine (`/[REDACTED:secret.entropy]`) was built\\n**without [REDACTED:secret.entropy]**, so the `drawtext`, `subtitles`, and `ass`\\nfilters are all unavailable (`ffmpeg -filters | grep drawtext` is empty; `ffmpeg -buildconf`\\nshows no freetype). `ffmpeg -h filter=drawtext` exits 0 even when absent — a false positive,\\nso check `-filters` instead.\\n\\n**How to render text on video without touching their ffmpeg:** Pillow (Python) is installed\\nand has its own freetype. Rasterize a transparent 1080x1920 PNG with Pillow, then composite\\nwith ffmpeg's `overlay` filter (which needs no freetype). Gives better typography (tracking,\\nsoft shadow) than drawtext anyway. System fonts available: Georgia, [REDACTED:pii.name] Roman,\\nBaskerville, Arial, Helvetica (under `/[REDACTED:secret.entropy]/`).\\n\\nAlternative if text-in-ffmpeg is required: `brew reinstall ffmpeg` pulls a bottle that\\n*should* include libfreetype — but that's invasive (they have a `prompt-to-reel` project\\ndepending on the current build), so prefer the Pillow path unless asked.\\n\\nSee the reusable opener pipeline at `~/Downloads/ai_india_opening/make_opening.sh` (auto-detects\\ndrawtext vs Pillow).\\n\",\"file_path\":\"/Users/atharva/.claude/projects/-Users-atharva-proofswe/memory/ffmpeg-no-drawtext.md\"}"
+      },
+      {
+        "turn_index": 69,
+        "name": "Edit",
+        "text": "{\"file_path\":\"/Users/atharva/.claude/projects/-Users-atharva-[REDACTED:secret.entropy].md\",\"new_string\":\"- [Claude transcript schema reality](claude-transcript-schema-reality.md) — empirical ~/.claude/projects record types/shapes; verify adapters against real data\\n- [ffmpeg lacks drawtext](ffmpeg-no-drawtext.md) — this Mac's Homebrew ffmpeg has no libfreetype; use Pillow PNG + overlay for video text\",\"old_string\":\"- [Claude transcript schema reality](claude-transcript-schema-reality.md) — empirical ~/.claude/projects record types/shapes; verify adapters against real data\",\"replace_all\":false}"
+      },
+      {
+        "turn_index": 70,
+        "name": "Bash",
+        "text": "{\"command\":\"open \\\"$HOME/Downloads/ai_india_opening/ai_india_opening_0_5s.mp4\\\" \\u0026\\u0026 echo \\\"opened ai_india_opening_0_5s.mp4 in the default player\\\"\",\"description\":\"Open the final opener in the default macOS player\"}"
+      }
+    ],
+    "tool_outputs": [
+      {
+        "turn_index": 0,
+        "text": "=== ffmpeg ===\n/[REDACTED:secret.entropy]\nffmpeg version 8.1 Copyright (c) 2000-2026 the FFmpeg developers\n=== ffprobe ===\n/opt/homebrew/bin/ffprobe\nffprobe version 8.1 Copyright (c) 2007-2026 the FFmpeg developers"
+      },
+      {
+        "turn_index": 1,
+        "text": "-rw-r--r--@   1 atharva  staff    12M Jun 12 16:00 agentclash-agent-opportunity-launch.mp4\n-rw-r--r--@   1 atharva  staff   7.1M Jun  1 15:23 chalkboard-demo.mp4\n-rw-r--r--@   1 atharva  staff    14M Jun 12 15:53 cursorful-video-1781259820966.mp4\n-rw-r--r--@   1 atharva  staff   5.8M Jun  2 17:28 water-cycle.mp4\n-rw-r--r--@   1 atharva  staff   5.3M Jun  2 23:27 wbc.mp4"
+      },
+      {
+        "turn_index": 2,
+        "text": "=== Recursive video search in Downloads (name + size) ===\n-rw-r--r--@ 1 atharva  staff  315304130 Jun 14 19:44 /[REDACTED:secret.entropy]/[REDACTED:pii.name] Ministry of [REDACTED:pii.name] Division .mp4\n-rw-r--r--@ 1 atharva  staff   14360806 Jun 12 15:53 /[REDACTED:secret.entropy]-video-1781259820966.mp4\n-rw-r--r--@ 1 atharva  staff   12924696 Jun 12 16:00 /[REDACTED:secret.entropy]-agent-opportunity-launch.mp4\n-rw-r--r--@ 1 atharva  staff    7487126 Jun  1 15:23 /[REDACTED:secret.entropy]-demo.mp4\n-rw-r--r--@ 1 atharva  staff    6108426 Jun  2 17:28 /[REDACTED:secret.entropy]-cycle.mp4\n-rw-r--r--@ 1 atharva  staff    5525827 Jun  2 23:27 /[REDACTED:secret.entropy].mp4\n\n=== Anything matching india / independ / archival anywhere obvious ===\n/[REDACTED:secret.entropy]/[REDACTED:pii.name] Ministry of [REDACTED:pii.name] Division .mp4"
+      },
+      {
+        "turn_index": 3,
+        "text": "=== Format ===\nformat_long_name=QuickTime / MOV\nduration=1192.298231\nsize=315304130\nbit_rate=2115605\n\n=== Video stream ===\ncodec_name=h264\nwidth=1280\nheight=720\npix_fmt=yuv420p\nr_frame_rate=25/1\navg_frame_rate=25/1\nduration=1192.240000\n\n=== Audio stream ===\ncodec_name=aac\nsample_rate=44100\nchannels=2\nchannel_layout=stereo"
+      },
+      {
+        "turn_index": 4,
+        "text": "Exit code 1\n=== Required filters present? ===\nadeclick adenorm afade amix anlmdn anoisesrc arnndn bitplanenoise chromanr colorbalance crystalizer curves eq format noise perlin pixdesctest scale scale2ref sine tile vibrato vignette xpsnr zoompan \n=== drawtext config (libfreetype) ===\ndrawtext OK\n\n=== Candidate fonts that actually exist ===\nFOUND: /[REDACTED:secret.entropy].ttf\nFOUND: /[REDACTED:secret.entropy]/[REDACTED:pii.name] Roman.ttf\nFOUND: /[REDACTED:secret.entropy].ttc\nFOUND: /[REDACTED:secret.entropy].ttf\nFOUND: /[REDACTED:secret.entropy].ttc\nFOUND: /[REDACTED:secret.entropy].ttf"
+      },
+      {
+        "turn_index": 5,
+        "text": "Project dir: /[REDACTED:secret.entropy]ai_india_opening\ntotal 0\ndrwxr-xr-x@  4 atharva  staff   128 Jun 14 19:50 .\ndrwx------@ 75 atharva  staff  2400 Jun 14 19:50 ..\ndrwxr-xr-x@  2 atharva  staff    64 Jun 14 19:50 candidates\ndrwxr-xr-x@  5 atharva  staff   160 Jun 14 19:50 work"
+      },
+      {
+        "turn_index": 6,
+        "text": "Command running in background with ID: bz15i5pna. Output is being written to: /[REDACTED:secret.entropy]-501/-Users-atharva-[REDACTED:secret.entropy]-a29d-4d27-8b67-[REDACTED:secret.entropy].output. You will be notified when it completes. To check interim output, use Read on that file path."
+      },
+      {
+        "turn_index": 7,
+        "text": "audio bed built\n=== level check ===\n[Parsed_volumedetect_0 @ 0xa5f0209c0] mean_volume: -24.9 dB\n[Parsed_volumedetect_0 @ 0xa5f0209c0] max_volume: -15.7 dB"
+      },
+      {
+        "turn_index": 8,
+        "text": "Exit code 1\n/[REDACTED:secret.entropy]ai_india_opening/work/segments/seg1.mp4: No such file or directory"
+      },
+      {
+        "turn_index": 9,
+        "text": "=== seg1.log (tail) ===\nInput #0, lavfi, from 'color=c=black:s=1080x1920:r=30:d=1.2':\n  Duration: N/A, start: 0.000000, bitrate: N/A\n  Stream #0:0: Video: wrapped_avframe, yuv420p, 1080x1920 [SAR 1:1 DAR 9:16], 30 fps, 30 tbr, 30 tbn\n[AVFilterGraph @ 0x7e3024200] No such filter: 'drawtext'\nError opening output file /[REDACTED:secret.entropy]ai_india_opening/work/segments/seg1.mp4.\nError opening output files: Filter not found\n\n=== libx264 present? ===\n V....D libx264              libx264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 (codec h264)\n V....D libx264rgb           libx264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 RGB (codec h264)\n V....D libx265              libx265 H.265 / HEVC (codec hevc)\n A....D aac                  AAC ([REDACTED:pii.name] Coding)\n A..... aac_at               aac (AudioToolbox) (codec aac)"
+      },
+      {
+        "turn_index": 10,
+        "text": "=== background extraction output ===\n[1/4] scene-change thumbnails (scene\u003e0.25) ...\n[2/4] fallback grid thumbnails (every 10s) ...\n[3/4] contact sheets (scene, 5x6/page) ...\n[4/4] contact sheets (grid, 5x6/page) ...\nEXTRACTION COMPLETE: scenes + grid + contact sheets\n\n=== counts ===\n(eval):6: no matches found: /[REDACTED:secret.entropy]ai_india_opening/work/scene_thumbs/scene_*.jpg\nscene thumbs: 0\n(eval):7: no matches found: /[REDACTED:secret.entropy]ai_india_opening/work/scene_thumbs/grid_*.jpg\ngrid thumbs:  0\n(eval):8: no matches found: /[REDACTED:secret.entropy]ai_india_opening/work/contact_sheets/scene_contact_*.jpg\nscene sheets: 0\n(eval):9: no matches found: /[REDACTED:secret.entropy]ai_india_opening/work/contact_sheets/grid_contact_*.jpg\ngrid sheets:  0\ntotal 0\ndrwxr-xr-x@  2 atharva  staff   64 Jun 14 19:50 .\ndrwxr-xr-x@ 12 atharva  staff  384 Jun 14 19:52 .."
+      },
+      {
+        "turn_index": 11,
+        "text": "=== text-capable filters in this ffmpeg ===\n TS colorize          V-\u003eV       Overlay a solid color on the video stream.\n T. drawbox           V-\u003eV       Draw a colored box on the input video.\n TS overlay           VV-\u003eV      Overlay a video source on top of the input.\n\n=== buildconf: freetype / fontconfig / libass / harfbuzz ===\n(no [REDACTED:secret.entropy] in build flags)\n\n=== brew ffmpeg ===\nffmpeg 8.1_1\ntap clue:\n/[REDACTED:secret.entropy].1_1/bin/ffmpeg"
+      },
+      {
+        "turn_index": 12,
+        "text": "=== ImageMagick? ===\nmagick not found\nconvert not found\nno ImageMagick\n\n=== Python PIL/Pillow? ===\nPillow 11.3.0 OK\n\n=== other ffmpeg builds on PATH/system ===\n(eval):8: no matches found: /[REDACTED:secret.entropy]*\nany drawtext-enabled ffmpeg via mdfind:\n/usr/share/zsh/5.9/functions/_ffmpeg\n/[REDACTED:secret.entropy] project/prompt-to-reel/docs/issues/ISSUE-004-ffmpeg-assembly-and-export-qa.md\n/[REDACTED:secret.entropy].9/lib/python/site-packages/yt_dlp/postprocessor/ffmpeg.py"
+      },
+      {
+        "turn_index": 13,
+        "text": "File created successfully at: /[REDACTED:secret.entropy]ai_india_opening/work/mktext.py (file state is current in your context — no need to Read it back)"
+      },
+      {
+        "turn_index": 14,
+        "text": "File created successfully at: /[REDACTED:secret.entropy]ai_india_opening/work/contact.py (file state is current in your context — no need to Read it back)"
+      },
+      {
+        "turn_index": 15,
+        "text": "Command running in background with ID: bs8ks5py4. Output is being written to: /[REDACTED:secret.entropy]-501/-Users-atharva-[REDACTED:secret.entropy]-a29d-4d27-8b67-[REDACTED:secret.entropy].output. You will be notified when it completes. To check interim output, use Read on that file path."
+      },
+      {
+        "turn_index": 16,
+        "text": "=== render 3 text cards (Pillow) ===\nwrote /[REDACTED:secret.entropy]ai_india_opening/work/text/title.png  font=/[REDACTED:secret.entropy].ttf size=62 lines=1\nwrote /[REDACTED:secret.entropy]ai_india_opening/work/text/caption.png  font=/[REDACTED:secret.entropy].ttf size=46 lines=1\nwrote /[REDACTED:secret.entropy]ai_india_opening/work/text/final.png  font=/[REDACTED:secret.entropy].ttf size=60 lines=1\n\n=== seg1: black + title overlay (Pillow PNG) ===\nseg1 OK\nverify frame ready"
+      },
+      {
+        "turn_index": 17,
+        "text": ""
+      },
+      {
+        "turn_index": 18,
+        "text": "=== bg task output so far ===\n(eval):4: no matches found: /[REDACTED:secret.entropy]ai_india_opening/work/scene_thumbs/*.jpg\n[1/4] scene thumbs (scene\u003e0.25) + showinfo timestamps ...\n    scene thumbs: 88\n[2/4] grid thumbs (every 10s) ...\n    grid thumbs: 119\n[3/4] labeled contact sheets (scene) ...\nwrote /[REDACTED:secret.entropy]ai_india_opening/work/contact_sheets/scene_contact_001.jpg (30 cells)\nwrote /[REDACTED:secret.entropy]ai_india_opening/work/contact_sheets/scene_contact_002.jpg (30 cells)\nwrote /[REDACTED:secret.entropy]ai_india_opening/work/contact_sheets/scene_contact_003.jpg (28 cells)\n88 thumbs -\u003e 3 sheet(s)\n[4/4] labeled contact sheets (grid) ...\nwrote /[REDACTED:secret.entropy]ai_india_opening/work/contact_sheets/grid_contact_001.jpg (30 cells)\nwrote /[REDACTED:secret.entropy]ai_india_opening/work/contact_sheets/grid_contact_002.jpg (30 cells)\nwrote /[REDACTED:secret.entropy]ai_india_opening/work/contact_sheets/grid_contact_003.jpg (30 cells)\nwrote /[REDACTED:secret.entropy]ai_india_opening/work/contact_sheets/grid_contact_004.jpg (29 cells)\n119 thumbs -\u003e 4 sheet(s)\nEXTRACTION+SHEETS COMPLETE\n\ndone marker: YES\nscene thumbs so far: 88\ngrid thumbs so far:  119"
+      },
+      {
+        "turn_index": 19,
+        "text": ""
+      },
+      {
+        "turn_index": 20,
+        "text": ""
+      },
+      {
+        "turn_index": 21,
+        "text": ""
+      },
+      {
+        "turn_index": 22,
+        "text": ""
+      },
+      {
+        "turn_index": 23,
+        "text": ""
+      },
+      {
+        "turn_index": 24,
+        "text": ""
+      },
+      {
+        "turn_index": 25,
+        "text": ""
+      },
+      {
+        "turn_index": 26,
+        "text": "extracting raw candidate frames:\n  raw_A_0238_masses.jpg @ 158.5\n  raw_B_0250_masses.jpg @ 170.0\n  raw_C_0300_darkyears.jpg @ 180.0\n  raw_D_0306_masses.jpg @ 186.0\n  raw_E_0323_gandhi_walk.jpg @ 203.5\n  raw_F_0448_crowd_march.jpg @ 288.7\n  raw_G_1431_huge_crowd.jpg @ 870.9\ntotal 912\ndrwxr-xr-x@  9 atharva  staff    288 Jun 14 20:00 .\ndrwxr-xr-x@ 17 atharva  staff    544 Jun 14 20:00 ..\n-rw-r--r--@  1 atharva  staff  51523 Jun 14 20:00 raw_A_0238_masses.jpg\n-rw-r--r--@  1 atharva  staff  67111 Jun 14 20:00 raw_B_0250_masses.jpg\n-rw-r--r--@  1 atharva  staff  64207 Jun 14 20:00 raw_C_0300_darkyears.jpg\n-rw-r--r--@  1 atharva  staff  66063 Jun 14 20:00 raw_D_0306_masses.jpg\n-rw-r--r--@  1 atharva  staff  53478 Jun 14 20:00 raw_E_0323_gandhi_walk.jpg\n-rw-r--r--@  1 atharva  staff  79826 Jun 14 20:00 raw_F_0448_crowd_march.jpg\n-rw-r--r--@  1 atharva  staff  67847 Jun 14 20:00 raw_G_1431_huge_crowd.jpg"
+      },
+      {
+        "turn_index": 27,
+        "text": ""
+      },
+      {
+        "turn_index": 28,
+        "text": ""
+      },
+      {
+        "turn_index": 29,
+        "text": ""
+      },
+      {
+        "turn_index": 30,
+        "text": ""
+      },
+      {
+        "turn_index": 31,
+        "text": ""
+      },
+      {
+        "turn_index": 32,
+        "text": ""
+      },
+      {
+        "turn_index": 33,
+        "text": ""
+      },
+      {
+        "turn_index": 34,
+        "text": "  prev_D_chains.jpg @ 186.0\n  prev_C_chains.jpg @ 180.0\n  prev_E_gandhi.jpg @ 203.8\n  prev_G_hugecrowd.jpg @ 870.9\n  prev_F_march.jpg @ 288.7\ndone"
+      },
+      {
+        "turn_index": 35,
+        "text": ""
+      },
+      {
+        "turn_index": 36,
+        "text": ""
+      },
+      {
+        "turn_index": 37,
+        "text": ""
+      },
+      {
+        "turn_index": 38,
+        "text": "C bright\nD2 bright\ngandhi8a\ngandhi8b"
+      },
+      {
+        "turn_index": 39,
+        "text": ""
+      },
+      {
+        "turn_index": 40,
+        "text": ""
+      },
+      {
+        "turn_index": 41,
+        "text": ""
+      },
+      {
+        "turn_index": 42,
+        "text": ""
+      },
+      {
+        "turn_index": 43,
+        "text": "Exit code 1\nASSEMBLE FAILED\n  Stream #1:0 (png) -\u003e format:default\n  Stream #2:0 (png) -\u003e format:default\n  Stream #3:0 (png) -\u003e format:default\n  Stream #4:0 (wrapped_avframe) -\u003e format:default\n  Stream #5:0 (wrapped_avframe) -\u003e format:default\n  concat:out:v0 -\u003e Stream #0:0 (libx264)\n  Stream #6:0 -\u003e #0:1 (pcm_s16le (native) -\u003e aac (native))\nPress [q] to stop, [?] for help\n[Parsed_concat_27 @ 0xb5eec1c80] Input link in0:v0 parameters (size 1080x1920, SAR 122880:122873) do not match the corresponding output link in0:v0 parameters (1080x1920, SAR 1:1)\n[Parsed_concat_27 @ 0xb5eec1c80] Failed to configure output pad on Parsed_concat_27\n[fc#0 @ 0xb5ec1c000] Error reinitializing filters!\n[fc#0 @ 0xb5ec1c000] Task finished with error code: -22 (Invalid argument)\n[fc#0 @ 0xb5ec1c000] Terminating thread with return code -22 (Invalid argument)\n[vost#0:0/libx264 @ 0xb5ed14000] [enc:libx264 @ 0xb5f110700] Could not open encoder before EOF\n[vost#0:0/libx264 @ 0xb5ed14000] Task finished with error code: -22 (Invalid argument)\n[vost#0:0/libx264 @ 0xb5ed14000] Terminating thread with return code -22 (Invalid argument)\n[out#0/mp4 @ 0xb5ec2d440] Nothing was written into output file, because at least one of its streams received no packets.\nframe=    0 fps=0.0 q=0.0 Lsize=       0KiB time=N/A bitrate=N/A speed=N/A elapsed=0:00:00.06    \n[aac @ 0xb5ee34380] Qavg: 61092.973\nConversion failed!\n=== probe ==="
+      },
+      {
+        "turn_index": 44,
+        "text": "ASSEMBLED OK\n=== probe ===\ncodec_name=h264\ncodec_type=video\nwidth=1080\nheight=1920\npix_fmt=yuv420p\nr_frame_rate=30/1\ncodec_name=aac\ncodec_type=audio\nsample_rate=44100\nchannels=1\nr_frame_rate=0/0\nduration=5.000000\nsize=3416386\nbit_rate=5466217"
+      },
+      {
+        "turn_index": 45,
+        "text": "frames:\nf_0.6.jpg\nf_1.8.jpg\nf_2.6.jpg\nf_3.6.jpg\nf_4.2.jpg\nf_4.7.jpg\n=== audio level of final ===\n[Parsed_volumedetect_0 @ 0x806c21bc0] mean_volume: -25.0 dB\n[Parsed_volumedetect_0 @ 0x806c21bc0] max_volume: -15.7 dB"
+      },
+      {
+        "turn_index": 46,
+        "text": ""
+      },
+      {
+        "turn_index": 47,
+        "text": ""
+      },
+      {
+        "turn_index": 48,
+        "text": ""
+      },
+      {
+        "turn_index": 49,
+        "text": ""
+      },
+      {
+        "turn_index": 50,
+        "text": "File created successfully at: /[REDACTED:secret.entropy]ai_india_opening/make_opening.sh (file state is current in your context — no need to Read it back)"
+      },
+      {
+        "turn_index": 51,
+        "text": "The file /[REDACTED:secret.entropy]ai_india_opening/make_opening.sh has been updated successfully. (file state is current in your context — no need to Read it back)"
+      },
+      {
+        "turn_index": 52,
+        "text": "syntax OK\n--- running: ./make_opening.sh candidates ---\n  \u001b[36m==\u003e\u001b[0m ffmpeg:  ffmpeg version 8.1 Copyright (c) 2000-2026 the FFmpeg developers\n  \u001b[36m==\u003e\u001b[0m ffprobe: ffprobe version 8.1 Copyright (c) 2007-2026 the FFmpeg developers\n  \u001b[36m==\u003e\u001b[0m SRC not provided — auto-locating an India/archival video…\n  \u001b[36m==\u003e\u001b[0m Source: /[REDACTED:secret.entropy]/[REDACTED:pii.name] Ministry of [REDACTED:pii.name] Division .mp4\n  \u001b[36m==\u003e\u001b[0m   duration=1192.298231s  video=1280x720  fps=yuv420p  pix=25/1\n  \u001b[36m==\u003e\u001b[0m Text engine: pillow  (drawtext=0 pillow=1)  font=/[REDACTED:secret.entropy].ttf\n  \u001b[36m==\u003e\u001b[0m scene thumbnails already present (RESCAN=1 to redo) — skipping scan\n  \u001b[36m==\u003e\u001b[0m Text cards rendered -\u003e /[REDACTED:secret.entropy]ai_india_opening/work/text\n  \u001b[36m==\u003e\u001b[0m Radio bed: mean_volume: -24.9 dB\n  \u001b[36m==\u003e\u001b[0m Assembling final opener…\n  \u001b[36m==\u003e\u001b[0m candidate 01_procession  @ 288.7s (00:04:48.700)\n  \u001b[36m==\u003e\u001b[0m candidate 02_chains_darkyears  @ 186.0s (00:03:06.000)\n  \u001b[36m==\u003e\u001b[0m candidate 03_enchained  @ 180.0s (00:03:00.000)\n  \u001b[36m==\u003e\u001b[0m candidate 04_gandhi_close  @ 203.8s (00:03:23.800)\n  \u001b[36m==\u003e\u001b[0m candidate 05_gandhi_crowd  @ 205.2s (00:03:25.200)\n  \u001b[36m==\u003e\u001b[0m candidate 06_vast_crowd  @ 870.9s (00:14:30.900)\n  \u001b[36m==\u003e\u001b[0m candidate 07_leader_mic  @ 468.0s (00:07:48.000)\n  \u001b[36m==\u003e\u001b[0m candidate 08_army_march  @ 1175.5s (00:19:35.500)\n  \u001b[36m==\u003e\u001b[0m Candidates + README -\u003e /[REDACTED:secret.entropy]ai_india_opening/candidates\n  \n  \u001b[32m================ DONE ================\u001b[0m\n  Final opener : /[REDACTED:secret.entropy]ai_india_opening/ai_india_opening_0_5s.mp4\n      codec_name=h264\n      codec_type=video\n      width=1080\n      height=1920\n      pix_fmt=yuv420p\n      r_frame_rate=30/1\n      codec_name=aac\n      codec_type=audio\n      r_frame_rate=0/0\n      duration=5.000000\n  \n  Structure / timestamps used:\n      0.0s–1.2s  black + radio static   \"India was not born powerful.\"\n      1.2s–4.4s  archival @ 288.7s (00:04:48.7), slow zoom + dark-blue grade   \"It inherited dependence.\"\n      4.4s–5.0s  fade to black   \"Then it chose to build.\"\n  \n  Candidate in-points:\n      01_procession          288.7s\n      02_chains_darkyears    186.0s\n      03_enchained           180.0s\n      04_gandhi_close        203.8s\n      05_gandhi_crowd        205.2s\n      06_vast_crowd          870.9s\n      07_leader_mic          468.0s\n      08_army_march          1175.5s\nShell cwd was reset to /Users/atharva/proofswe"
+      },
+      {
+        "turn_index": 53,
+        "text": "The file /[REDACTED:secret.entropy]ai_india_opening/make_opening.sh has been updated successfully. (file state is current in your context — no need to Read it back)"
+      },
+      {
+        "turn_index": 54,
+        "text": "=== candidate files ===\n3.3M\t/[REDACTED:secret.entropy]ai_india_opening/candidates/opening_candidate_01_procession.mp4\n4.2M\t/[REDACTED:secret.entropy]ai_india_opening/candidates/opening_candidate_02_chains_darkyears.mp4\n4.2M\t/[REDACTED:secret.entropy]ai_india_opening/candidates/opening_candidate_03_enchained.mp4\n4.0M\t/[REDACTED:secret.entropy]ai_india_opening/candidates/opening_candidate_04_gandhi_close.mp4\n3.9M\t/[REDACTED:secret.entropy]ai_india_opening/candidates/opening_candidate_05_gandhi_crowd.mp4\n3.8M\t/[REDACTED:secret.entropy]ai_india_opening/candidates/opening_candidate_06_vast_crowd.mp4\n4.0M\t/[REDACTED:secret.entropy]ai_india_opening/candidates/opening_candidate_07_leader_mic.mp4\n4.2M\t/[REDACTED:secret.entropy]ai_india_opening/candidates/opening_candidate_08_army_march.mp4\n\n=== README.md ===\n# Candidate openers\n\nEach file is a complete 5-second opener (same black-title and final-line beats,\nsame synthesised radio bed) differing only in the **archival in-point** used for\nthe 1.2s–4.4s segment. Source: `[REDACTED:pii.name] Ministry of [REDACTED:pii.name] Division .mp4`. Pick one and copy it over\n`ai_india_opening_0_5s.mp4`, or re-run: `ARCH_START=\u003cseconds\u003e ./make_opening.sh`.\n\n| File | In-point | Likely contents |\n|------|----------|-----------------|\n| `opening_candidate_01_procession.mp4` | 00:04:48.700 (288.7s) | A white-clad figure descends steps through a dense crowd; long continuous take (CHOSEN primary). |\n| `opening_candidate_02_chains_darkyears.mp4` | 00:03:06.000 (186.0s) | Rows of men in chains, heads bowed — 'the dark years' of bondage. The literal image of inherited dependence. |\n| `opening_candidate_03_enchained.mp4` | 00:03:00.000 (180.0s) | Huddled, bowed figures in chains — 'though her body was enchained'. |\n| `opening_candidate_04_gandhi_close.mp4` | 00:03:23.800 (203.8s) | Gandhi in close shot, head bowed, spectacles — iconic and immediately readable. |\n| `opening_candidate_05_gandhi_crowd.mp4` | 00:03:25.200 (205.2s) | Gandhi walking among followers in white caps; movement and depth. |\n| `opening_candidate_06_vast_crowd.mp4` | 00:14:30.900 (870.9s) | An immense sea of people before temple gopurams — epic scale of a gathered nation. |\n| `opening_candidate_07_leader_mic.mp4` | 00:07:48.000 (468.0s) | A leader addressing a microphone (Nehru-era address); the moment of speaking up. |\n| `opening_candidate_08_army_march.mp4` | 00:19:35.500 (1175.5s) | Soldiers marching in formation — the new nation choosing to build/defend itself. |\n\n=== extract archival-beat frame (t=2.6s) from a few candidates ===\n  cand_02_chains_darkyears.jpg\n  cand_06_vast_crowd.jpg\n  cand_07_leader_mic.jpg\n  cand_08_army_march.jpg"
+      },
+      {
+        "turn_index": 55,
+        "text": ""
+      },
+      {
+        "turn_index": 56,
+        "text": ""
+      },
+      {
+        "turn_index": 57,
+        "text": ""
+      },
+      {
+        "turn_index": 58,
+        "text": ""
+      },
+      {
+        "turn_index": 59,
+        "text": "alt_438.0.jpg\nalt_470.0.jpg\nalt_474.0.jpg\nalt_478.0.jpg\nalt_482.0.jpg"
+      },
+      {
+        "turn_index": 60,
+        "text": ""
+      },
+      {
+        "turn_index": 61,
+        "text": ""
+      },
+      {
+        "turn_index": 62,
+        "text": ""
+      },
+      {
+        "turn_index": 63,
+        "text": "The file /[REDACTED:secret.entropy]ai_india_opening/make_opening.sh has been updated successfully. (file state is current in your context — no need to Read it back)"
+      },
+      {
+        "turn_index": 64,
+        "text": "==\u003e candidate 01_procession  @ 288.7s (00:04:48.700)\n==\u003e candidate 02_chains_darkyears  @ 186.0s (00:03:06.000)\n==\u003e candidate 03_enchained  @ 180.0s (00:03:00.000)\n==\u003e candidate 04_gandhi_close  @ 203.8s (00:03:23.800)\n==\u003e candidate 05_gandhi_crowd  @ 205.2s (00:03:25.200)\n==\u003e candidate 06_vast_crowd  @ 870.9s (00:14:30.900)\n==\u003e candidate 07_nehru_profile  @ 474.0s (00:07:54.000)\n==\u003e candidate 08_crowds_steps  @ 1175.5s (00:19:35.500)\n==\u003e Candidates + README -\u003e /[REDACTED:secret.entropy]ai_india_opening/candidates\n================ DONE ================\nFinal opener : /[REDACTED:secret.entropy]ai_india_opening/ai_india_opening_0_5s.mp4\n--- files now ---\nopening_candidate_01_procession.mp4\nopening_candidate_02_chains_darkyears.mp4\nopening_candidate_03_enchained.mp4\nopening_candidate_04_gandhi_close.mp4\nopening_candidate_05_gandhi_crowd.mp4\nopening_candidate_06_vast_crowd.mp4\nopening_candidate_07_nehru_profile.mp4\nopening_candidate_08_crowds_steps.mp4\nextracted 07 nehru\nShell cwd was reset to /Users/atharva/proofswe"
+      },
+      {
+        "turn_index": 65,
+        "text": ""
+      },
+      {
+        "turn_index": 66,
+        "text": "=== spec check: final + all candidates (want 1080x1920, 30/1, yuv420p, h264+aac, ~5.0s) ===\nai_india_opening_0_5s.mp4                      v=h264,1080,1920,yuv420p,30/1 a=aac dur=5.000000\nopening_candidate_01_procession.mp4            v=h264,1080,1920,yuv420p,30/1 a=aac dur=5.000000\nopening_candidate_02_chains_darkyears.mp4      v=h264,1080,1920,yuv420p,30/1 a=aac dur=5.000000\nopening_candidate_03_enchained.mp4             v=h264,1080,1920,yuv420p,30/1 a=aac dur=5.000000\nopening_candidate_04_gandhi_close.mp4          v=h264,1080,1920,yuv420p,30/1 a=aac dur=5.000000\nopening_candidate_05_gandhi_crowd.mp4          v=h264,1080,1920,yuv420p,30/1 a=aac dur=5.000000\nopening_candidate_06_vast_crowd.mp4            v=h264,1080,1920,yuv420p,30/1 a=aac dur=5.000000\nopening_candidate_07_nehru_profile.mp4         v=h264,1080,1920,yuv420p,30/1 a=aac dur=5.000000\nopening_candidate_08_crowds_steps.mp4          v=h264,1080,1920,yuv420p,30/1 a=aac dur=5.000000\n\n=== source integrity (must be unmodified) ===\nJun 14 19:44:21 2026 /[REDACTED:secret.entropy]/[REDACTED:pii.name] Ministry of [REDACTED:pii.name] Division .mp4\nsource still present \u0026 readable: yes"
+      },
+      {
+        "turn_index": 67,
+        "text": "1\t# Memory index\n2\t\n3\t- [No Claude attribution](no-claude-attribution.md) — omit Co-Authored-By/Claude mentions in commits \u0026 PRs for proofswe\n4\t- [Claude transcript schema reality](claude-transcript-schema-reality.md) — empirical ~/.claude/projects record types/shapes; verify adapters against real data\n5\t"
+      },
+      {
+        "turn_index": 68,
+        "text": "File created successfully at: /Users/atharva/.claude/projects/-Users-atharva-proofswe/memory/ffmpeg-no-drawtext.md (file state is current in your context — no need to Read it back)"
+      },
+      {
+        "turn_index": 69,
+        "text": "The file /Users/atharva/.claude/projects/-Users-atharva-[REDACTED:secret.entropy].md has been updated successfully. (file state is current in your context — no need to Read it back)"
+      },
+      {
+        "turn_index": 70,
+        "text": "opened ai_india_opening_0_5s.mp4 in the default player"
+      }
+    ]
+  },
+  "code": {
+    "patch": "+++ b/internal/score/score.go\n+//\n+// This scorecard is a provisional local preview only; the official benchmark\n+// score always comes from a server-judged submission, never from local scoring.\n",
+    "files": [
+      {
+        "path": "internal/score/score.go",
+        "role": "solution"
+      }
+    ]
+  },
+  "outcome": {
+    "landed": false,
+    "landing_quality": "none",
+    "termination": "clean",
+    "human_turns": 3,
+    "rework_count": 3,
+    "interruptions": 1,
+    "files_touched": 5
+  },
+  "scorecard": {
+    "composite": 44.1,
+    "axes": [
+      {
+        "name": "efficiency",
+        "score": 61
+      },
+      {
+        "name": "autonomy",
+        "score": 100
+      },
+      {
+        "name": "friction",
+        "score": 72.7
+      },
+      {
+        "name": "success",
+        "score": 66.3
+      }
+    ],
+    "note": "provisional session utility; sigmoid priors, deterministic-first, judge capped"
+  },
+  "scrub": {
+    "scrubber_version": "redact/1",
+    "spans_redacted": 244,
+    "notice": "automated redaction is best-effort and can miss secrets"
+  }
+}
