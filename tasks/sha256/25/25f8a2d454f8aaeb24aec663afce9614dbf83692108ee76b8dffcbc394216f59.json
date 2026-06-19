@@ -1,0 +1,92 @@
+{
+  "corpus_schema_version": 1,
+  "task_id": "sha256:25f8a2d454f8aaeb24aec663afce9614dbf83692108ee76b8dffcbc394216f59",
+  "contributed_at": "2026-06-19T15:27:34.528738Z",
+  "harness": "codex",
+  "model": "gpt-5.4",
+  "repo": {
+    "remote_url": "https://github.com/Atharva-Kanherkar/proofswe.git",
+    "base_commit": "8ef01a0de75d810d8896a2a00e47e260b03bf224",
+    "base_commit_source": "transcript_start",
+    "branch": "main",
+    "license_spdx": "MIT",
+    "is_public": true
+  },
+  "prompts": [
+    {
+      "turn_index": 0,
+      "role": "user",
+      "text": "Fix the off-by-one error in the pagination helper"
+    }
+  ],
+  "transcript": {
+    "assistant_messages": [
+      {
+        "turn_index": 0,
+        "text": "I'll implement that by editing internal/cli/feature_01.go."
+      },
+      {
+        "turn_index": 1,
+        "text": "Done. Edited the file and the tests pass."
+      }
+    ],
+    "tool_calls": [
+      {
+        "turn_index": 0,
+        "name": "apply_patch",
+        "text": "*** [REDACTED:pii.name]: internal/cli/feature_01.go"
+      },
+      {
+        "turn_index": 1,
+        "name": "exec_command",
+        "text": "{\"cmd\": \"go test ./...\", \"workdir\": \"/Users/atharva/proofswe\"}"
+      }
+    ],
+    "tool_outputs": [
+      {
+        "turn_index": 0,
+        "text": "updated internal/cli/feature_01.go"
+      },
+      {
+        "turn_index": 1,
+        "text": "ok  all tests passed"
+      }
+    ]
+  },
+  "outcome": {
+    "verification": "passed",
+    "landed": false,
+    "landing_quality": "none",
+    "termination": "clean",
+    "human_turns": 1,
+    "files_touched": 1
+  },
+  "scorecard": {
+    "composite": 73.2,
+    "score_version": "score/2",
+    "axes": [
+      {
+        "name": "efficiency",
+        "score": 95.5
+      },
+      {
+        "name": "autonomy",
+        "score": 100
+      },
+      {
+        "name": "friction",
+        "score": 88.9
+      },
+      {
+        "name": "success",
+        "score": 73
+      }
+    ],
+    "note": "provisional session utility; sigmoid priors, deterministic-first, judge capped"
+  },
+  "scrub": {
+    "scrubber_version": "redact/1",
+    "spans_redacted": 1,
+    "notice": "automated redaction is best-effort and can miss secrets"
+  }
+}
